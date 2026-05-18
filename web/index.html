@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AstraCore OS</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand-block">
+        <div class="brand-orb"></div>
+        <div>
+          <div class="brand">ASTRACORE OS</div>
+          <div class="subbrand">local-first agentic operator</div>
+        </div>
+      </div>
+      <div class="status-strip">
+        <span id="clock">00:00:00</span>
+        <span>cost mode: <b>$0 local</b></span>
+        <span id="provider-status">model: local-tools-v0</span>
+      </div>
+    </header>
+
+    <main class="main-grid">
+      <aside class="rail">
+        <button class="rail-btn active" title="Operator">⌁</button>
+        <button class="rail-btn" title="Agents">◎</button>
+        <button class="rail-btn" title="Memory" id="memory-btn">◇</button>
+        <button class="rail-btn" title="Tasks">▣</button>
+      </aside>
+
+      <section class="directive-panel">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">Directive Stream</div>
+            <div class="panel-sub">Chat with the operator</div>
+          </div>
+          <div class="tiny-led"></div>
+        </div>
+
+        <div id="chat-history" class="chat-history">
+          <div class="msg agent">
+            <div class="msg-name">ASTRACORE</div>
+            <div class="msg-bubble">Operator ready. Local tools are active. Paid models are disabled until you explicitly enable them.</div>
+          </div>
+        </div>
+
+        <div class="composer">
+          <textarea id="directive-input" rows="2" placeholder="Issue a directive..."></textarea>
+          <div class="composer-row">
+            <div class="mode-pills">
+              <span class="pill active">Normal</span>
+              <span class="pill">Build</span>
+              <span class="pill">Research</span>
+              <span class="pill">Deep</span>
+            </div>
+            <button id="send-btn">Send</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="visor">
+        <canvas id="orbitalBrainCanvas"></canvas>
+        <div class="visor-overlay"></div>
+        <div class="visor-head">
+          <div>
+            <div class="visor-title">Primary Visor Canvas</div>
+            <div class="visor-sub">Artifacts, files, tool output, and live activity</div>
+          </div>
+          <button id="clear-visor">Clear</button>
+        </div>
+
+        <div class="activity-card" id="activity-card">
+          <div class="activity-title">System Standby</div>
+          <div id="activity-steps" class="activity-steps">
+            <div class="step">Waiting for directive.</div>
+          </div>
+        </div>
+
+        <div id="active-display-area" class="display-area"></div>
+      </section>
+    </main>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,89 @@
+from pathlib import Path
+
+from app.operator_agent import OperatorAgent
+
+
+def test_mobile_detailing_docx_created(tmp_path: Path):
+    agent = OperatorAgent(tmp_path)
+
+    result = agent.run(
+        "Create a one-page business plan for a mobile detailing business and save it as a Word document."
+    )
+
+    assert result.ok is True
+    assert result.mode == "document"
+    assert result.model["provider"] == "local"
+    assert result.model["estimated_cost_usd"] == 0.0
+    assert result.artifacts
+    assert result.context_packets
+    assert result.context_packets[0]["agent"] == "business_documentation_agent"
+    path = Path(result.artifacts[0]["path"])
+    assert path.exists()
+    assert path.suffix == ".docx"
+
+
+def test_greeting_is_local_and_cheap(tmp_path: Path):
+    agent = OperatorAgent(tmp_path)
+
+    result = agent.run("hey how are you")
+
+    assert result.ok is True
+    assert result.mode == "chat"
+    assert result.message == "I'm good. What do you want to test first?"
+    assert result.artifacts == []
+    assert result.model["paid_call_allowed"] is False
+    assert result.context_packets == []
+
+
+def test_capability_question_is_plain_text(tmp_path: Path):
+    agent = OperatorAgent(tmp_path)
+
+    result = agent.run("what can you do?")
+
+    assert result.ok is True
+    assert result.mode == "chat"
+    assert "Business Documentation Agent" in result.message
+    assert result.artifacts == []
+
+
+def test_business_documentation_agent_handles_multiple_business_prompts(tmp_path: Path):
+    agent = OperatorAgent(tmp_path)
+    prompts = [
+        ("Make a simple SOP for a cleaning business as a Word document.", "sop", "cleaning business"),
+        ("Write a proposal for a local web design service and save it as a docx file.", "proposal", "local web design service"),
+        ("Create a one-page finance report for a small bakery in a Word document.", "finance_report", "small bakery"),
+    ]
+
+    for prompt, expected_type, expected_business in prompts:
+        result = agent.run(prompt)
+        packet = result.context_packets[0]
+
+        assert result.ok is True
+        assert result.mode == "document"
+        assert result.artifacts
+        assert packet["data"]["document_type"] == expected_type
+        assert packet["data"]["business"] == expected_business
+        assert Path(result.artifacts[0]["path"]).exists()
+
+
+def test_business_documentation_packet_without_file_when_no_document_requested(tmp_path: Path):
+    agent = OperatorAgent(tmp_path)
+
+    result = agent.run("Make a simple proposal for a local web design service business.")
+
+    assert result.ok is True
+    assert result.mode == "agent_packet"
+    assert result.artifacts == []
+    assert result.context_packets[0]["data"]["document_type"] == "proposal"
+
+
+def test_business_documentation_memory_can_be_read_back(tmp_path: Path):
+    agent = OperatorAgent(tmp_path)
+
+    agent.run("Make a simple SOP for a cleaning business as a Word document.")
+    memory = agent.recent_memory()
+
+    assert len(memory) == 1
+    assert "cleaning business" in memory[0]["directive"]
+    assert memory[0]["context_packets"][0]["agent"] == "business_documentation_agent"
+    assert memory[0]["artifact_path"].endswith(".docx")

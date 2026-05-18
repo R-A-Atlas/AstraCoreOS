@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+workspace/outputs/*.docx
+workspace/memory/*.jsonl

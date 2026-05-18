@@ -1,0 +1,290 @@
+const chatHistory = document.getElementById("chat-history");
+const input = document.getElementById("directive-input");
+const sendBtn = document.getElementById("send-btn");
+const displayArea = document.getElementById("active-display-area");
+const activitySteps = document.getElementById("activity-steps");
+const providerStatus = document.getElementById("provider-status");
+const memoryBtn = document.getElementById("memory-btn");
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function tickClock() {
+  document.getElementById("clock").textContent = new Date().toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+function appendMessage(role, text) {
+  const div = document.createElement("div");
+  div.className = `msg ${role}`;
+  div.innerHTML = `
+    <div class="msg-name">${role === "user" ? "You" : "AstraCore"}</div>
+    <div class="msg-bubble">${escapeHtml(text)}</div>
+  `;
+  chatHistory.appendChild(div);
+  chatHistory.scrollTop = chatHistory.scrollHeight;
+}
+
+function renderSteps(steps) {
+  activitySteps.innerHTML = "";
+  for (const step of steps || []) {
+    const div = document.createElement("div");
+    div.className = "step";
+    div.textContent = `${step.label}: ${step.detail}`;
+    activitySteps.appendChild(div);
+  }
+}
+
+function renderArtifacts(artifacts) {
+  for (const artifact of artifacts || []) {
+    const card = document.createElement("div");
+    card.className = "artifact-card";
+    card.innerHTML = `
+      <div class="artifact-kind">${escapeHtml(artifact.kind || "artifact")}</div>
+      <div class="artifact-title">${escapeHtml(artifact.title || "Untitled")}</div>
+      <div class="artifact-summary">${escapeHtml(artifact.summary || "")}</div>
+      <div class="artifact-path">${escapeHtml(artifact.path || "")}</div>
+      ${artifact.download_url ? `<a href="${escapeHtml(artifact.download_url)}" download>Download file</a>` : ""}
+    `;
+    displayArea.prepend(card);
+  }
+}
+
+function renderContextPackets(contextPackets) {
+  for (const packet of contextPackets || []) {
+    const data = packet.data || {};
+    const card = document.createElement("div");
+    card.className = "packet-card";
+    const sections = (data.recommended_sections || []).slice(0, 8);
+    const sources = packet.sources || [];
+    const warnings = packet.warnings || [];
+    card.innerHTML = `
+      <div class="packet-head">
+        <div>
+          <div class="packet-kind">Context Packet</div>
+          <div class="artifact-title">${escapeHtml(packet.agent || "agent")}</div>
+        </div>
+        <div class="confidence">${Math.round(Number(packet.confidence || 0) * 100)}%</div>
+      </div>
+      <div class="artifact-summary">${escapeHtml(packet.summary || "")}</div>
+      <div class="packet-meta">
+        <span>${escapeHtml(data.document_type || "task")}</span>
+        <span>${escapeHtml(data.business || "topic")}</span>
+        <span>${escapeHtml(data.format || "chat")}</span>
+      </div>
+      ${sections.length ? `<div class="packet-list"><b>Sections</b>${sections.map(item => `<span>${escapeHtml(item)}</span>`).join("")}</div>` : ""}
+      ${sources.length ? `<div class="packet-list"><b>Sources</b>${sources.map(item => `<span>${escapeHtml(item)}</span>`).join("")}</div>` : ""}
+      ${warnings.length ? `<div class="packet-warnings">${warnings.map(item => `<div>${escapeHtml(item)}</div>`).join("")}</div>` : ""}
+    `;
+    displayArea.prepend(card);
+  }
+}
+
+function renderMemory(items) {
+  const card = document.createElement("div");
+  card.className = "memory-card";
+  const rows = (items || []).slice().reverse();
+  card.innerHTML = `
+    <div class="packet-kind">Memory</div>
+    <div class="artifact-title">Recent Agent Runs</div>
+    ${
+      rows.length
+        ? rows.map(item => {
+            const packets = item.context_packets || [];
+            const agentNames = packets.map(packet => packet.agent).filter(Boolean).join(", ");
+            return `
+              <div class="memory-row">
+                <div class="memory-directive">${escapeHtml(item.directive || "No directive")}</div>
+                <div class="artifact-summary">${escapeHtml((item.memory || []).join(" "))}</div>
+                ${agentNames ? `<div class="artifact-path">agents: ${escapeHtml(agentNames)}</div>` : ""}
+                ${item.artifact_path ? `<div class="artifact-path">${escapeHtml(item.artifact_path)}</div>` : ""}
+              </div>
+            `;
+          }).join("")
+        : `<div class="artifact-summary">No memory has been written yet.</div>`
+    }
+  `;
+  displayArea.prepend(card);
+}
+
+async function loadMemory() {
+  renderSteps([{ label: "Memory", detail: "Loading recent local memory." }]);
+  try {
+    const response = await fetch("/api/memory?limit=8");
+    const data = await response.json();
+    renderMemory(data.items || []);
+    renderSteps([{ label: "Memory loaded", detail: `${(data.items || []).length} records found.` }]);
+  } catch (error) {
+    renderSteps([{ label: "Memory error", detail: error.message || "Failed to load memory." }]);
+  }
+}
+
+async function sendDirective() {
+  const directive = input.value.trim();
+  if (!directive) return;
+
+  appendMessage("user", directive);
+  input.value = "";
+  sendBtn.disabled = true;
+  renderSteps([{ label: "Thinking", detail: "Routing directive through local-first operator." }]);
+  burstNetwork();
+
+  try {
+    const started = Date.now();
+    const response = await fetch("/api/operator", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ directive })
+    });
+    const data = await response.json();
+    const elapsed = Date.now() - started;
+    if (elapsed < 550) await new Promise(resolve => setTimeout(resolve, 550 - elapsed));
+
+    appendMessage("agent", data.message || "Done.");
+    renderSteps(data.steps || []);
+    renderContextPackets(data.context_packets || []);
+    renderArtifacts(data.artifacts || []);
+    if (data.model) {
+      providerStatus.textContent = `model: ${data.model.provider}/${data.model.model}`;
+    }
+  } catch (error) {
+    appendMessage("agent", `Request failed: ${error.message || error}`);
+    renderSteps([{ label: "Error", detail: "Backend request failed." }]);
+  } finally {
+    sendBtn.disabled = false;
+    input.focus();
+  }
+}
+
+sendBtn.addEventListener("click", sendDirective);
+input.addEventListener("keydown", event => {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    sendDirective();
+  }
+});
+document.getElementById("clear-visor").addEventListener("click", () => {
+  displayArea.innerHTML = "";
+  renderSteps([{ label: "Cleared", detail: "Primary visor is empty." }]);
+});
+memoryBtn.addEventListener("click", loadMemory);
+
+const canvas = document.getElementById("orbitalBrainCanvas");
+const ctx = canvas.getContext("2d");
+let width = 0;
+let height = 0;
+let activityBurst = 0;
+const nodes = [];
+const edges = [];
+let packets = [];
+
+function resizeCanvas() {
+  width = canvas.width = canvas.parentElement.offsetWidth;
+  height = canvas.height = canvas.parentElement.offsetHeight;
+}
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
+
+for (let ring = 1; ring <= 4; ring++) {
+  const radius = ring * 86;
+  const count = ring * 6;
+  for (let i = 0; i < count; i++) {
+    nodes.push({
+      ring,
+      radius,
+      angle: (Math.PI * 2 / count) * i,
+      baseAngle: (Math.PI * 2 / count) * i,
+      spinSpeed: (0.001 / ring) * (ring % 2 === 0 ? 1 : -1)
+    });
+  }
+}
+const core = { ring: 0, radius: 0, angle: 0, x: 0, y: 0 };
+nodes.filter(n => n.ring === 1).forEach(n => edges.push({ source: core, target: n }));
+nodes.forEach(n => {
+  if (n.ring < 4) {
+    const outer = nodes.filter(o => o.ring === n.ring + 1);
+    outer.sort((a, b) => Math.abs(a.baseAngle - n.baseAngle) - Math.abs(b.baseAngle - n.baseAngle));
+    edges.push({ source: n, target: outer[0] });
+  }
+});
+
+function burstNetwork() {
+  activityBurst = 1;
+}
+
+function animate() {
+  ctx.clearRect(0, 0, width, height);
+  const cx = width / 2;
+  const cy = height / 2;
+  activityBurst = Math.max(0, activityBurst - 0.01);
+  const multiplier = 1 + activityBurst * 4;
+
+  core.x = cx;
+  core.y = cy;
+  for (const node of nodes) {
+    node.angle += node.spinSpeed * multiplier;
+    node.x = cx + Math.cos(node.angle) * node.radius;
+    node.y = cy + Math.sin(node.angle) * node.radius;
+  }
+
+  for (const edge of edges) {
+    ctx.beginPath();
+    ctx.moveTo(edge.source.x, edge.source.y);
+    ctx.lineTo(edge.target.x, edge.target.y);
+    ctx.strokeStyle = `rgba(251, 191, 36, ${0.045 + activityBurst * 0.16})`;
+    ctx.lineWidth = 1 + activityBurst;
+    ctx.stroke();
+  }
+
+  if (Math.random() < 0.08 + activityBurst * 0.42) {
+    const edge = edges[Math.floor(Math.random() * Math.min(edges.length, 12))];
+    packets.push({ edge, progress: 0, speed: 0.012 + Math.random() * 0.026 + activityBurst * 0.02 });
+  }
+
+  packets = packets.filter(packet => {
+    packet.progress += packet.speed;
+    const p = Math.min(packet.progress, 1);
+    const x = packet.edge.source.x + (packet.edge.target.x - packet.edge.source.x) * p;
+    const y = packet.edge.source.y + (packet.edge.target.y - packet.edge.source.y) * p;
+    ctx.beginPath();
+    ctx.arc(x, y, 2, 0, Math.PI * 2);
+    ctx.fillStyle = "#fff7cc";
+    ctx.shadowColor = "#fbbf24";
+    ctx.shadowBlur = 14 + activityBurst * 18;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    return packet.progress < 1;
+  });
+
+  for (const node of nodes) {
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, 1.4 + activityBurst, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(251, 191, 36, ${0.35 + activityBurst * 0.55})`;
+    ctx.fill();
+  }
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, 10 + activityBurst * 5, 0, Math.PI * 2);
+  ctx.fillStyle = "#050505";
+  ctx.strokeStyle = "#fbbf24";
+  ctx.lineWidth = 2 + activityBurst * 2;
+  ctx.shadowColor = "#fbbf24";
+  ctx.shadowBlur = 22 + activityBurst * 32;
+  ctx.fill();
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  requestAnimationFrame(animate);
+}
+animate();
