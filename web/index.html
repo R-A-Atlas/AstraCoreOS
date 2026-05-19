@@ -3,84 +3,100 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AstraCore OS</title>
+  <title>AstraCore Trading Command Center</title>
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
-  <div class="shell">
+  <main class="app-shell">
     <header class="topbar">
-      <div class="brand-block">
-        <div class="brand-orb"></div>
-        <div>
-          <div class="brand">ASTRACORE OS</div>
-          <div class="subbrand">trading command center</div>
-        </div>
+      <div>
+        <div class="brand">AstraCore</div>
+        <div class="subbrand">Trading capture -> Pine strategy</div>
       </div>
-      <div class="status-strip">
+      <div class="status-row">
         <span id="clock">00:00:00</span>
-        <span>cost mode: <b>$0 local</b></span>
-        <span id="provider-status">model: local-tools-v0</span>
+        <span id="provider-status">local tools ready</span>
       </div>
     </header>
 
-    <main class="main-grid">
-      <aside class="rail">
-        <button class="rail-btn active" title="Command Center" id="command-center-btn">⌁</button>
-        <button class="rail-btn" title="Agents">◎</button>
-        <button class="rail-btn" title="Memory" id="memory-btn">◇</button>
-        <button class="rail-btn" title="Trade Capture Studio" id="capture-btn">REC</button>
-      </aside>
+    <section class="hero-panel">
+      <div class="hero-copy">
+        <h1>Turn your screen reads into TradingView strategies.</h1>
+        <p>Record your chart and voice, summarize the setup, then generate a clean Pine v6 script with entries, exits, and alerts.</p>
+      </div>
+      <div class="hero-steps">
+        <div><b>1</b><span>Capture</span></div>
+        <div><b>2</b><span>Extract rules</span></div>
+        <div><b>3</b><span>Generate Pine</span></div>
+      </div>
+    </section>
 
-      <section class="directive-panel">
-        <div class="panel-head">
+    <section class="workspace-grid">
+      <article class="panel capture-panel">
+        <div class="panel-title-row">
           <div>
-            <div class="panel-title">Trading Directive Stream</div>
-            <div class="panel-sub">Plan, review, journal, and coordinate work</div>
+            <h2>Trade Capture</h2>
+            <p>Share your TradingView screen and explain the setup out loud.</p>
           </div>
-          <div class="tiny-led"></div>
+          <span id="capture-state" class="pill">idle</span>
         </div>
 
-        <div id="chat-history" class="chat-history">
-          <div class="msg agent">
-            <div class="msg-name">ASTRACORE</div>
-            <div class="msg-bubble">Trading command center ready. Ask for market prep, a trade plan, a journal entry, or a strategy note. Live market tools are not wired yet.</div>
-          </div>
+        <div class="capture-actions">
+          <button id="start-capture-btn" class="primary-btn" type="button">Start recording</button>
+          <button id="stop-capture-btn" class="ghost-btn" type="button" disabled>Stop</button>
         </div>
 
-        <div class="composer">
-          <textarea id="directive-input" rows="2" placeholder="Ask AstraCore about market prep, trade plans, risk, or journaling..."></textarea>
-          <div class="composer-row">
-            <label class="deep-toggle" title="Ask AstraCore to use the deepest research workflow when it is available.">
-              <input id="deep-research-toggle" type="checkbox" />
-              <span>Deep research</span>
-            </label>
-            <button id="send-btn">Send</button>
-          </div>
-        </div>
-      </section>
+        <video id="capture-preview" class="capture-preview" controls muted></video>
 
-      <section class="visor">
-        <canvas id="orbitalBrainCanvas"></canvas>
-        <div class="visor-overlay"></div>
-        <div class="visor-head">
+        <div class="hint-list">
+          <span>Say what confirms the trade.</span>
+          <span>Say what invalidates it.</span>
+          <span>Say when you skip.</span>
+        </div>
+      </article>
+
+      <article class="panel strategy-panel">
+        <div class="panel-title-row">
           <div>
-            <div class="visor-title">Trading Command Center</div>
-            <div class="visor-sub">Market prep, watchlist, plans, journal, and agent tasks</div>
-          </div>
-          <button id="clear-visor">Clear</button>
-        </div>
-
-        <div class="activity-card" id="activity-card">
-          <div class="activity-title">System Standby</div>
-          <div id="activity-steps" class="activity-steps">
-            <div class="step">Waiting for directive.</div>
+            <h2>Strategy Builder</h2>
+            <p>Write the plain-English version. AstraCore creates the Pine starter.</p>
           </div>
         </div>
 
-        <div id="active-display-area" class="display-area"></div>
-      </section>
-    </main>
-  </div>
+        <textarea id="strategy-notes" rows="8" placeholder="Example: NQ scalp. Long when price reclaims the prior candle high while fast EMA is above slow EMA. Avoid chop. Stop under reclaim candle. Target 1 to 1.5 ATR or nearest liquidity. Short is inverse."></textarea>
+
+        <div class="strategy-actions">
+          <button id="generate-pine-btn" class="primary-btn" type="button">Generate Pine v6</button>
+          <span id="pine-output" class="output-status">No script generated yet.</span>
+        </div>
+      </article>
+    </section>
+
+    <section class="lower-grid">
+      <article class="panel compact-panel">
+        <div class="panel-title-row">
+          <div>
+            <h2>Saved Captures</h2>
+            <p>Recent recordings ready for review.</p>
+          </div>
+          <button id="refresh-captures-btn" class="tiny-btn" type="button">Refresh</button>
+        </div>
+        <div id="captures-list" class="feed-list"></div>
+      </article>
+
+      <article class="panel compact-panel">
+        <div class="panel-title-row">
+          <div>
+            <h2>TradingView Alerts</h2>
+            <p>Latest webhook alerts received by AstraCore.</p>
+          </div>
+          <button id="refresh-alerts-btn" class="tiny-btn" type="button">Refresh</button>
+        </div>
+        <div id="alerts-list" class="feed-list"></div>
+      </article>
+    </section>
+  </main>
+
   <script src="/static/app.js"></script>
 </body>
 </html>
