@@ -1,5 +1,8 @@
 from pathlib import Path
 
+from fastapi.testclient import TestClient
+
+from app.backend import app
 from app.capture_studio import CaptureStudio
 from app.command_center import default_command_center_state
 from app.config import AppConfig
@@ -290,3 +293,14 @@ def test_pine_generator_creates_clean_strategy_file(tmp_path: Path):
     assert "strategy.entry" in content
     assert "alert(" in content
     assert "plotshape" in content
+
+
+def test_studio_route_serves_focused_capture_ui():
+    client = TestClient(app)
+
+    response = client.get("/studio")
+
+    assert response.status_code == 200
+    assert "AstraCore Studio" in response.text
+    assert "Connect a display to begin" in response.text
+    assert "/static/studio.js" in response.text

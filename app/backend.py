@@ -58,6 +58,11 @@ def index() -> FileResponse:
     return FileResponse(WEB / "index.html", media_type="text/html; charset=utf-8")
 
 
+@app.get("/studio")
+def studio() -> FileResponse:
+    return FileResponse(WEB / "studio.html", media_type="text/html; charset=utf-8")
+
+
 @app.get("/health")
 def health() -> dict:
     status = config.safe_status()
