@@ -2,7 +2,9 @@ from pathlib import Path
 
 from app.command_center import default_command_center_state
 from app.config import AppConfig
+from app.notifications import notification_channels
 from app.operator_agent import OperatorAgent
+from app.skills_registry import skill_catalog
 
 
 def test_mobile_detailing_docx_created(tmp_path: Path):
@@ -165,3 +167,34 @@ def test_default_command_center_state_is_trading_focused():
     assert "NQ" in state["market_prep"]["focus"]
     assert state["agent_tasks"][0]["owner"] == "Codex"
     assert state["agent_tasks"][1]["owner"] == "Claude Code"
+    assert any(task["skill_id"] == "daily_market_prep" for task in state["intel_tasks"])
+    assert any(channel["id"] == "telegram" for channel in state["notification_channels"])
+
+
+def test_skill_catalog_registers_trading_intel_prompts():
+    catalog = skill_catalog()
+    skill_ids = {skill["id"] for skill in catalog["skills"]}
+
+    assert catalog["domain"] == "trading_command_center"
+    assert "daily_market_prep" in skill_ids
+    assert "risk_check" in skill_ids
+    assert "journal_review" in skill_ids
+    assert all(skill["prompt_template"] for skill in catalog["skills"])
+
+
+def test_notification_status_does_not_expose_secret_values(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("TELEGRAM_ENABLED", "true")
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "telegram-secret")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat-secret")
+    monkeypatch.setenv("EMAIL_PROVIDER", "sendgrid")
+    monkeypatch.setenv("SENDGRID_API_KEY", "sendgrid-secret")
+    monkeypatch.setenv("NOTIFICATION_EMAIL_TO", "test@example.com")
+
+    channels = [channel.to_dict() for channel in notification_channels()]
+
+    assert channels[0]["id"] == "telegram"
+    assert channels[0]["status"] == "ready"
+    assert channels[1]["id"] == "email"
+    assert channels[1]["configured"] is True
+    assert "telegram-secret" not in str(channels)
+    assert "sendgrid-secret" not in str(channels)

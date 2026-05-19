@@ -128,6 +128,8 @@ function renderCommandCenter(state) {
   const tradePlans = state.trade_plans || [];
   const journal = state.journal || [];
   const tasks = state.agent_tasks || [];
+  const intelTasks = state.intel_tasks || [];
+  const notificationChannels = state.notification_channels || [];
   const notes = state.workflow_notes || [];
   card.innerHTML = `
     <div class="packet-kind">Command Center</div>
@@ -159,6 +161,24 @@ function renderCommandCenter(state) {
       <section>
         <b>Agent Work</b>
         ${tasks.map(task => `<p>${escapeHtml(task.owner)} · ${escapeHtml(task.status)} · ${escapeHtml(task.task)}</p>`).join("")}
+      </section>
+      <section>
+        <b>Intel Skills</b>
+        ${intelTasks.map(task => `
+          <p>
+            <span class="skill-status ${escapeHtml(task.status)}">${escapeHtml(task.status)}</span>
+            ${escapeHtml(task.title)} · ${escapeHtml(task.cadence)}
+          </p>
+        `).join("") || "<p>No intel skills registered.</p>"}
+      </section>
+      <section>
+        <b>Update Channels</b>
+        ${notificationChannels.map(channel => `
+          <p>
+            <span class="skill-status ${channel.configured ? "configured" : "off"}">${escapeHtml(channel.status)}</span>
+            ${escapeHtml(channel.title)}
+          </p>
+        `).join("") || "<p>No update channels configured.</p>"}
       </section>
       <section>
         <b>Workflow Rules</b>

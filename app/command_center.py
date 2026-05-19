@@ -3,6 +3,9 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from datetime import date
 
+from app.notifications import notification_channels
+from app.skills_registry import trading_intel_skills
+
 
 @dataclass(frozen=True)
 class CommandCenterState:
@@ -13,6 +16,8 @@ class CommandCenterState:
     trade_plans: list[dict]
     journal: list[dict]
     agent_tasks: list[dict]
+    intel_tasks: list[dict]
+    notification_channels: list[dict]
     workflow_notes: list[str]
 
     def to_dict(self) -> dict:
@@ -52,6 +57,17 @@ def default_command_center_state() -> CommandCenterState:
                 "status": "waiting",
             },
         ],
+        intel_tasks=[
+            {
+                "skill_id": skill.id,
+                "title": skill.title,
+                "cadence": skill.cadence,
+                "status": skill.status,
+                "tools_needed": skill.tools_needed,
+            }
+            for skill in trading_intel_skills()
+        ],
+        notification_channels=[channel.to_dict() for channel in notification_channels()],
         workflow_notes=[
             "Codex owns code changes, tests, commits, and local verification.",
             "Claude Code can be used as a separate worker for specs, critique, and alternate implementation notes.",

@@ -9,7 +9,9 @@ from pydantic import BaseModel, Field
 
 from app.command_center import default_command_center_state
 from app.config import AppConfig
+from app.notifications import notification_channels
 from app.operator_agent import OperatorAgent
+from app.skills_registry import skill_catalog
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -59,6 +61,23 @@ def command_center() -> dict:
     return {
         "ok": True,
         "state": default_command_center_state().to_dict(),
+    }
+
+
+@app.get("/api/skills")
+def skills() -> dict:
+    return {
+        "ok": True,
+        **skill_catalog(),
+    }
+
+
+@app.get("/api/intel/status")
+def intel_status() -> dict:
+    return {
+        "ok": True,
+        **skill_catalog(),
+        "notifications": [channel.to_dict() for channel in notification_channels()],
     }
 
 
