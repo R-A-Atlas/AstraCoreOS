@@ -5,6 +5,7 @@ const displayArea = document.getElementById("active-display-area");
 const activitySteps = document.getElementById("activity-steps");
 const providerStatus = document.getElementById("provider-status");
 const memoryBtn = document.getElementById("memory-btn");
+const commandCenterBtn = document.getElementById("command-center-btn");
 const deepResearchToggle = document.getElementById("deep-research-toggle");
 
 function escapeHtml(value) {
@@ -119,6 +120,67 @@ function renderMemory(items) {
   displayArea.prepend(card);
 }
 
+function renderCommandCenter(state) {
+  const card = document.createElement("div");
+  card.className = "command-center-card";
+  const prep = state.market_prep || {};
+  const watchlist = state.watchlist || [];
+  const tradePlans = state.trade_plans || [];
+  const journal = state.journal || [];
+  const tasks = state.agent_tasks || [];
+  const notes = state.workflow_notes || [];
+  card.innerHTML = `
+    <div class="packet-kind">Command Center</div>
+    <div class="artifact-title">${escapeHtml(state.title || "AstraCore Trading Command Center")}</div>
+    <div class="packet-meta">
+      <span>${escapeHtml(state.session_date || "today")}</span>
+      <span>trading focused</span>
+      <span>live data pending</span>
+    </div>
+    <div class="command-grid">
+      <section>
+        <b>Market Prep</b>
+        <p>Bias: ${escapeHtml(prep.bias || "unset")}</p>
+        <p>Risk: ${escapeHtml(prep.risk_mode || "unset")}</p>
+        <p>News: ${escapeHtml(prep.news || "pending")}</p>
+      </section>
+      <section>
+        <b>Watchlist</b>
+        ${watchlist.map(item => `<p>${escapeHtml(item.symbol)} · ${escapeHtml(item.status)} · ${escapeHtml(item.note)}</p>`).join("") || "<p>No symbols yet.</p>"}
+      </section>
+      <section>
+        <b>Trade Plans</b>
+        ${tradePlans.length ? tradePlans.map(item => `<p>${escapeHtml(item.symbol)} · ${escapeHtml(item.status)}</p>`).join("") : "<p>No saved trade plans yet.</p>"}
+      </section>
+      <section>
+        <b>Journal</b>
+        ${journal.length ? journal.map(item => `<p>${escapeHtml(item.symbol)} · ${escapeHtml(item.result)}</p>`).join("") : "<p>No journal entries yet.</p>"}
+      </section>
+      <section>
+        <b>Agent Work</b>
+        ${tasks.map(task => `<p>${escapeHtml(task.owner)} · ${escapeHtml(task.status)} · ${escapeHtml(task.task)}</p>`).join("")}
+      </section>
+      <section>
+        <b>Workflow Rules</b>
+        ${notes.map(note => `<p>${escapeHtml(note)}</p>`).join("")}
+      </section>
+    </div>
+  `;
+  displayArea.prepend(card);
+}
+
+async function loadCommandCenter() {
+  renderSteps([{ label: "Command center", detail: "Loading trading workspace." }]);
+  try {
+    const response = await fetch("/api/command-center");
+    const data = await response.json();
+    renderCommandCenter(data.state || {});
+    renderSteps([{ label: "Command center loaded", detail: "Market prep, watchlist, journal, and agent task lanes are visible." }]);
+  } catch (error) {
+    renderSteps([{ label: "Command center error", detail: error.message || "Failed to load command center." }]);
+  }
+}
+
 async function loadMemory() {
   renderSteps([{ label: "Memory", detail: "Loading recent local memory." }]);
   try {
@@ -221,6 +283,8 @@ document.getElementById("clear-visor").addEventListener("click", () => {
   renderSteps([{ label: "Cleared", detail: "Primary visor is empty." }]);
 });
 memoryBtn.addEventListener("click", loadMemory);
+commandCenterBtn.addEventListener("click", loadCommandCenter);
+loadCommandCenter();
 loadConfigStatus();
 
 const canvas = document.getElementById("orbitalBrainCanvas");

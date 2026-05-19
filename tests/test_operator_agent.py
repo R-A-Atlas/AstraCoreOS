@@ -1,7 +1,8 @@
 from pathlib import Path
 
-from app.operator_agent import OperatorAgent
+from app.command_center import default_command_center_state
 from app.config import AppConfig
+from app.operator_agent import OperatorAgent
 
 
 def test_mobile_detailing_docx_created(tmp_path: Path):
@@ -155,3 +156,12 @@ def test_general_prompt_routes_to_general_model_when_enabled(tmp_path: Path):
     assert result.model["paid_call_allowed"] is True
     assert result.artifacts == []
     assert result.context_packets == []
+
+
+def test_default_command_center_state_is_trading_focused():
+    state = default_command_center_state().to_dict()
+
+    assert state["title"] == "AstraCore Trading Command Center"
+    assert "NQ" in state["market_prep"]["focus"]
+    assert state["agent_tasks"][0]["owner"] == "Codex"
+    assert state["agent_tasks"][1]["owner"] == "Claude Code"

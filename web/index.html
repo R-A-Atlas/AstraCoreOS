@@ -13,7 +13,7 @@
         <div class="brand-orb"></div>
         <div>
           <div class="brand">ASTRACORE OS</div>
-          <div class="subbrand">local-first agentic operator</div>
+          <div class="subbrand">trading command center</div>
         </div>
       </div>
       <div class="status-strip">
@@ -25,7 +25,7 @@
 
     <main class="main-grid">
       <aside class="rail">
-        <button class="rail-btn active" title="Operator">⌁</button>
+        <button class="rail-btn active" title="Command Center" id="command-center-btn">⌁</button>
         <button class="rail-btn" title="Agents">◎</button>
         <button class="rail-btn" title="Memory" id="memory-btn">◇</button>
         <button class="rail-btn" title="Tasks">▣</button>
@@ -34,8 +34,8 @@
       <section class="directive-panel">
         <div class="panel-head">
           <div>
-            <div class="panel-title">Directive Stream</div>
-            <div class="panel-sub">Chat with the operator</div>
+            <div class="panel-title">Trading Directive Stream</div>
+            <div class="panel-sub">Plan, review, journal, and coordinate work</div>
           </div>
           <div class="tiny-led"></div>
         </div>
@@ -43,12 +43,12 @@
         <div id="chat-history" class="chat-history">
           <div class="msg agent">
             <div class="msg-name">ASTRACORE</div>
-            <div class="msg-bubble">Operator ready. Local tools are active. Paid models are disabled until you explicitly enable them.</div>
+            <div class="msg-bubble">Trading command center ready. Ask for market prep, a trade plan, a journal entry, or a strategy note. Live market tools are not wired yet.</div>
           </div>
         </div>
 
         <div class="composer">
-          <textarea id="directive-input" rows="2" placeholder="Issue a directive..."></textarea>
+          <textarea id="directive-input" rows="2" placeholder="Ask AstraCore about market prep, trade plans, risk, or journaling..."></textarea>
           <div class="composer-row">
             <label class="deep-toggle" title="Ask AstraCore to use the deepest research workflow when it is available.">
               <input id="deep-research-toggle" type="checkbox" />
@@ -64,8 +64,8 @@
         <div class="visor-overlay"></div>
         <div class="visor-head">
           <div>
-            <div class="visor-title">Primary Visor Canvas</div>
-            <div class="visor-sub">Artifacts, files, tool output, and live activity</div>
+            <div class="visor-title">Trading Command Center</div>
+            <div class="visor-sub">Market prep, watchlist, plans, journal, and agent tasks</div>
           </div>
           <button id="clear-visor">Clear</button>
         </div>

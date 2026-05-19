@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from app.command_center import default_command_center_state
 from app.config import AppConfig
 from app.operator_agent import OperatorAgent
 
@@ -50,6 +51,14 @@ def config_status() -> dict:
     return {
         "ok": True,
         "status": config.safe_status(),
+    }
+
+
+@app.get("/api/command-center")
+def command_center() -> dict:
+    return {
+        "ok": True,
+        "state": default_command_center_state().to_dict(),
     }
 
 

@@ -327,7 +327,7 @@ textarea:focus { border-color: var(--line-strong); }
   overflow-y: auto;
   max-height: calc(100% - 170px);
 }
-.artifact-card, .packet-card, .memory-card {
+.artifact-card, .packet-card, .memory-card, .command-center-card {
   width: min(520px, 100%);
   border: 1px solid rgba(251,191,36,.26);
   border-radius: 12px;
@@ -440,6 +440,36 @@ textarea:focus { border-color: var(--line-strong); }
 .memory-card {
   border-color: rgba(34,197,94,.28);
 }
+.command-center-card {
+  width: min(780px, 100%);
+  border-color: rgba(251,191,36,.32);
+}
+.command-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.command-grid section {
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.025);
+  border-radius: 10px;
+  padding: 12px;
+}
+.command-grid b {
+  display: block;
+  color: var(--text);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  margin-bottom: 8px;
+}
+.command-grid p {
+  margin: 6px 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
 .memory-row {
   border-top: 1px solid var(--line);
   padding-top: 12px;
@@ -461,4 +491,5 @@ textarea:focus { border-color: var(--line-strong); }
   .rail { flex-direction: row; }
   .directive-panel { min-height: 520px; }
   .visor { min-height: 620px; }
+  .command-grid { grid-template-columns: 1fr; }
 }
