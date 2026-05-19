@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from app.command_center import default_command_center_state
 from app.config import AppConfig
+from app.capture_studio import CaptureStudio
 from app.intel_runner import IntelRunner
 from app.notifications import notification_channels
 from app.operator_agent import OperatorAgent
@@ -19,15 +20,20 @@ from app.tradingview import TradingViewBridge
 ROOT = Path(__file__).resolve().parents[1]
 WEB = ROOT / "web"
 OUTPUTS = ROOT / "workspace" / "outputs"
+CAPTURES = ROOT / "workspace" / "captures"
+OUTPUTS.mkdir(parents=True, exist_ok=True)
+CAPTURES.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="AstraCore OS", version="0.1.0")
 config = AppConfig(ROOT)
 agent = OperatorAgent(ROOT)
 intel_runner = IntelRunner()
 tradingview_bridge = TradingViewBridge(ROOT)
+capture_studio = CaptureStudio(ROOT)
 
 app.mount("/static", StaticFiles(directory=WEB), name="static")
 app.mount("/outputs", StaticFiles(directory=OUTPUTS), name="outputs")
+app.mount("/captures", StaticFiles(directory=CAPTURES), name="captures")
 
 
 class OperatorRequest(BaseModel):
@@ -137,4 +143,35 @@ def recent_memory(limit: int = 10) -> dict:
     return {
         "ok": True,
         "items": agent.recent_memory(safe_limit),
+    }
+
+
+@app.post("/api/captures")
+async def save_capture(request: Request, filename: str = "") -> dict:
+    raw = await request.body()
+    try:
+        session = capture_studio.save_capture(raw, filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "ok": True,
+        "capture": {
+            **session.to_dict(),
+            "download_url": f"/captures/{session.filename}",
+        },
+    }
+
+
+@app.get("/api/captures")
+def list_captures(limit: int = 20) -> dict:
+    safe_limit = min(max(limit, 1), 50)
+    return {
+        "ok": True,
+        "captures": [
+            {
+                **session.to_dict(),
+                "download_url": f"/captures/{session.filename}",
+            }
+            for session in capture_studio.recent_captures(safe_limit)
+        ],
     }

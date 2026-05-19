@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from app.capture_studio import CaptureStudio
 from app.command_center import default_command_center_state
 from app.config import AppConfig
 from app.intel_runner import IntelRunner
@@ -257,3 +258,16 @@ def test_tradingview_bridge_rejects_bad_secret(tmp_path: Path, monkeypatch):
         assert "Invalid TradingView" in str(exc)
     else:
         raise AssertionError("Expected bad TradingView secret to be rejected.")
+
+
+def test_capture_studio_saves_webm_capture(tmp_path: Path):
+    studio = CaptureStudio(tmp_path)
+
+    session = studio.save_capture(b"fake-webm-data", "my screen review.webm")
+    recent = studio.recent_captures()
+
+    assert session.filename.endswith(".webm")
+    assert " " not in session.filename
+    assert Path(session.path).exists()
+    assert recent[-1].id == session.id
+    assert recent[-1].transcript_status == "pending"

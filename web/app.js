@@ -6,7 +6,12 @@ const activitySteps = document.getElementById("activity-steps");
 const providerStatus = document.getElementById("provider-status");
 const memoryBtn = document.getElementById("memory-btn");
 const commandCenterBtn = document.getElementById("command-center-btn");
+const captureBtn = document.getElementById("capture-btn");
 const deepResearchToggle = document.getElementById("deep-research-toggle");
+let captureRecorder = null;
+let captureChunks = [];
+let captureStream = null;
+let captureStartedAt = null;
 
 function escapeHtml(value) {
   return String(value)
@@ -118,6 +123,126 @@ function renderMemory(items) {
     }
   `;
   displayArea.prepend(card);
+}
+
+function renderCaptureStudio(captures = []) {
+  const card = document.createElement("div");
+  card.className = "command-center-card";
+  card.innerHTML = `
+    <div class="packet-kind">Trade Capture Studio</div>
+    <div class="artifact-title">Record screen + voice</div>
+    <div class="artifact-summary">
+      Explain your chart, entry model, invalidation, and trade management out loud while AstraCore records the screen.
+      The saved session becomes the source material for strategy extraction.
+    </div>
+    <div class="capture-actions">
+      <button class="download-btn" id="start-capture-btn" type="button">Start Capture</button>
+      <button class="inline-action" id="stop-capture-btn" type="button" disabled>Stop</button>
+      <span id="capture-state" class="artifact-path">idle</span>
+    </div>
+    <video id="capture-preview" class="capture-preview" controls muted></video>
+    <div class="packet-list">
+      <b>Recent captures</b>
+      ${
+        captures.length
+          ? captures.map(item => `<span>${escapeHtml(item.filename)} · ${Math.round(Number(item.size_bytes || 0) / 1024)} KB · ${escapeHtml(item.transcript_status || "pending")}</span>`).join("")
+          : "<span>No capture sessions saved yet.</span>"
+      }
+    </div>
+  `;
+  displayArea.prepend(card);
+  card.querySelector("#start-capture-btn").addEventListener("click", () => startCapture(card));
+  card.querySelector("#stop-capture-btn").addEventListener("click", () => stopCapture(card));
+}
+
+async function loadCaptureStudio() {
+  renderSteps([{ label: "Capture studio", detail: "Loading recent capture sessions." }]);
+  try {
+    const response = await fetch("/api/captures?limit=8");
+    const data = await response.json();
+    renderCaptureStudio(data.captures || []);
+    renderSteps([{ label: "Capture studio loaded", detail: "Screen and microphone recording is available from the browser." }]);
+  } catch (error) {
+    renderSteps([{ label: "Capture studio error", detail: error.message || "Failed to load capture studio." }]);
+  }
+}
+
+async function startCapture(card) {
+  const state = card.querySelector("#capture-state");
+  const startBtn = card.querySelector("#start-capture-btn");
+  const stopBtn = card.querySelector("#stop-capture-btn");
+  const preview = card.querySelector("#capture-preview");
+  try {
+    state.textContent = "requesting screen and microphone permission";
+    const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+    let micStream = null;
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      micStream = null;
+    }
+    const tracks = [
+      ...screenStream.getVideoTracks(),
+      ...screenStream.getAudioTracks(),
+      ...(micStream ? micStream.getAudioTracks() : [])
+    ];
+    captureStream = new MediaStream(tracks);
+    captureChunks = [];
+    captureStartedAt = new Date();
+    captureRecorder = new MediaRecorder(captureStream, { mimeType: "video/webm" });
+    captureRecorder.ondataavailable = event => {
+      if (event.data && event.data.size) captureChunks.push(event.data);
+    };
+    captureRecorder.onstop = () => uploadCapture(card);
+    captureRecorder.start(1000);
+    preview.srcObject = captureStream;
+    startBtn.disabled = true;
+    stopBtn.disabled = false;
+    state.textContent = "recording";
+    renderSteps([{ label: "Capture started", detail: "Explain your trading process out loud while showing the chart." }]);
+  } catch (error) {
+    state.textContent = `capture blocked: ${error.message || error}`;
+    renderSteps([{ label: "Capture blocked", detail: "Browser permission was denied or screen capture is unavailable." }]);
+  }
+}
+
+function stopCapture(card) {
+  const state = card.querySelector("#capture-state");
+  if (captureRecorder && captureRecorder.state !== "inactive") {
+    state.textContent = "saving";
+    captureRecorder.stop();
+  }
+  if (captureStream) {
+    captureStream.getTracks().forEach(track => track.stop());
+  }
+}
+
+async function uploadCapture(card) {
+  const state = card.querySelector("#capture-state");
+  const startBtn = card.querySelector("#start-capture-btn");
+  const stopBtn = card.querySelector("#stop-capture-btn");
+  const blob = new Blob(captureChunks, { type: "video/webm" });
+  const stamp = (captureStartedAt || new Date()).toISOString().replace(/[:.]/g, "-");
+  try {
+    const response = await fetch(`/api/captures?filename=trade-capture-${encodeURIComponent(stamp)}.webm`, {
+      method: "POST",
+      headers: { "Content-Type": "video/webm" },
+      body: blob
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.detail || "Capture upload failed.");
+    state.innerHTML = `saved · <a href="${escapeHtml(data.capture.download_url)}" download>download</a>`;
+    renderSteps([{ label: "Capture saved", detail: data.capture.filename }]);
+  } catch (error) {
+    state.textContent = `save failed: ${error.message || error}`;
+    renderSteps([{ label: "Capture save failed", detail: error.message || "Upload failed." }]);
+  } finally {
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    captureRecorder = null;
+    captureStream = null;
+    captureChunks = [];
+  }
 }
 
 function renderCommandCenter(state) {
@@ -344,6 +469,7 @@ document.getElementById("clear-visor").addEventListener("click", () => {
 });
 memoryBtn.addEventListener("click", loadMemory);
 commandCenterBtn.addEventListener("click", loadCommandCenter);
+captureBtn.addEventListener("click", loadCaptureStudio);
 displayArea.addEventListener("click", event => {
   const button = event.target.closest(".run-skill-btn");
   if (!button) return;

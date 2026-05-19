@@ -5,3 +5,5 @@ __pycache__/
 workspace/outputs/*.docx
 workspace/memory/*.jsonl
 workspace/integrations/*.jsonl
+workspace/captures/*.webm
+workspace/captures/*.jsonl

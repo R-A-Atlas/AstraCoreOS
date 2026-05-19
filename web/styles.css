@@ -271,6 +271,21 @@ textarea:focus { border-color: var(--line-strong); }
 .inline-action:hover {
   background: rgba(251,191,36,.16);
 }
+.capture-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 14px 0;
+}
+.capture-preview {
+  width: 100%;
+  max-height: 260px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #000;
+  margin-top: 8px;
+}
 
 .visor {
   position: relative;
