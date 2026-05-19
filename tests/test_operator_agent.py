@@ -324,8 +324,9 @@ def test_strategy_generator_creates_mt5_and_instruction_exports(tmp_path: Path):
     assert mt5.filename.endswith(".mq5")
     assert "#include <Trade/Trade.mqh>" in mt5_content
     assert "Trade.Buy" in mt5_content
-    assert instructions.filename.endswith(".md")
+    assert instructions.filename.endswith(".html")
     assert "Execution Checklist" in instructions_content
+    assert "AstraCore Trade Playbook" in instructions_content
     assert "reclaiming prior candle high" in instructions_content
 
 

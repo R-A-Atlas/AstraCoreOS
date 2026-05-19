@@ -472,7 +472,7 @@ async function generateStrategyExport(exportType = "pine") {
   els.exportBtns.forEach((button) => {
     button.disabled = true;
   });
-  const label = exportType === "mt5" ? "MT5/MQL5 Expert Advisor" : exportType === "instructions" ? "trade instructions" : "Pine Script";
+  const label = exportType === "mt5" ? "MT5/MQL5 Expert Advisor" : exportType === "instructions" ? "visual trade playbook" : "Pine Script";
   els.pineResult.textContent = `Building ${label} from ${notes ? "typed notes" : "latest capture transcript"}...`;
   try {
     const response = await fetch("/api/strategies/export", {

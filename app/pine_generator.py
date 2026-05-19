@@ -62,7 +62,7 @@ class PineStrategyGenerator:
         clean_name = self._clean_title(name)
         brief = self._instructions_template(clean_name, notes)
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        filename = self._safe_filename(clean_name, ".md")
+        filename = self._safe_filename(clean_name, ".html")
         path = self.output_dir / filename
         path.write_text(brief, encoding="utf-8")
         return StrategyArtifact(
@@ -70,7 +70,7 @@ class PineStrategyGenerator:
             title=clean_name,
             filename=filename,
             path=str(path),
-            summary="Generated plain-English trading instructions from the capture transcript and strategy notes.",
+            summary="Generated a visual HTML trading playbook from the capture transcript and strategy notes.",
             created_at=datetime.now(timezone.utc).isoformat(),
         )
 
@@ -112,36 +112,236 @@ class PineStrategyGenerator:
     @staticmethod
     def _instructions_template(title: str, notes: str) -> str:
         cleaned = (notes or "").strip() or "No transcript supplied."
-        return f"""# {title}
+        escaped_title = PineStrategyGenerator._escape_html(title)
+        escaped_notes = PineStrategyGenerator._escape_html(cleaned)
+        return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{escaped_title} · Trade Playbook</title>
+  <style>
+    :root {{
+      --bg: #080910;
+      --panel: rgba(18, 20, 31, 0.86);
+      --panel-2: rgba(255, 255, 255, 0.045);
+      --line: rgba(255, 255, 255, 0.12);
+      --text: #f6f7fb;
+      --muted: #a7adbf;
+      --brand: #a78bfa;
+      --hot: #ff4f58;
+      --good: #45f28a;
+      --warn: #f9ca4d;
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 12% 0%, rgba(167, 139, 250, 0.22), transparent 28rem),
+        radial-gradient(circle at 86% 18%, rgba(255, 79, 88, 0.14), transparent 24rem),
+        linear-gradient(135deg, #080910, #12111c 58%, #090a10);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }}
+    main {{
+      width: min(1120px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 48px 0;
+    }}
+    header {{
+      display: grid;
+      gap: 18px;
+      margin-bottom: 28px;
+    }}
+    .brand {{
+      color: var(--brand);
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 12px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }}
+    h1 {{
+      margin: 0;
+      max-width: 820px;
+      font-size: clamp(42px, 7vw, 82px);
+      line-height: 0.92;
+      letter-spacing: -0.07em;
+    }}
+    .subtitle {{
+      max-width: 720px;
+      color: var(--muted);
+      font-size: 18px;
+    }}
+    .grid {{
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 18px;
+      align-items: start;
+    }}
+    .card {{
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: var(--panel);
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
+      padding: 22px;
+    }}
+    .card h2 {{
+      margin: 0 0 14px;
+      font-size: 19px;
+      letter-spacing: -0.03em;
+    }}
+    .steps {{
+      display: grid;
+      gap: 12px;
+      counter-reset: step;
+    }}
+    .step {{
+      counter-increment: step;
+      display: grid;
+      grid-template-columns: 42px 1fr;
+      gap: 12px;
+      align-items: start;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel-2);
+    }}
+    .step::before {{
+      content: counter(step);
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--brand);
+      color: #0b0714;
+      font-weight: 800;
+    }}
+    .chips {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }}
+    .chip {{
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 7px 10px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.04);
+      font-size: 13px;
+    }}
+    .transcript {{
+      white-space: pre-wrap;
+      color: #d9dcef;
+      background: rgba(0, 0, 0, 0.26);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 16px;
+      max-height: 460px;
+      overflow: auto;
+    }}
+    .rule {{
+      display: grid;
+      gap: 6px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--line);
+    }}
+    .rule:last-child {{ border-bottom: 0; }}
+    .rule strong {{ color: var(--text); }}
+    .rule span {{ color: var(--muted); }}
+    .badge-row {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 20px;
+    }}
+    .badge {{
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.05);
+      min-width: 150px;
+    }}
+    .badge b {{
+      display: block;
+      color: var(--good);
+      font-size: 20px;
+    }}
+    footer {{
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 13px;
+    }}
+    @media (max-width: 880px) {{
+      .grid {{ grid-template-columns: 1fr; }}
+      main {{ padding: 28px 0; }}
+    }}
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="brand">AstraCore Trade Playbook</div>
+      <h1>{escaped_title}</h1>
+      <p class="subtitle">A structured trading guide generated from your captured narration. Use it to refine your discretionary process into repeatable rules.</p>
+      <div class="badge-row">
+        <div class="badge"><b>01</b>Context first</div>
+        <div class="badge"><b>02</b>Confirmation only</div>
+        <div class="badge"><b>03</b>Defined invalidation</div>
+      </div>
+    </header>
 
-## Source Transcript / Trader Narration
+    <section class="grid">
+      <article class="card">
+        <h2>Strategy Logic</h2>
+        <div class="steps">
+          <div class="step"><div><strong>Read the market context.</strong><br><span>Trend direction, active session, volatility, and nearby liquidity come before entry.</span></div></div>
+          <div class="step"><div><strong>Wait for confirmation.</strong><br><span>Default long confirmation is reclaiming the prior candle high. Default short confirmation is rejecting below the prior candle low.</span></div></div>
+          <div class="step"><div><strong>Align with trend.</strong><br><span>Do not force trades against the fast and slow trend unless your narration clearly defines a reversal setup.</span></div></div>
+          <div class="step"><div><strong>Define invalidation before entry.</strong><br><span>The stop belongs beyond the trigger candle or the level that proves the idea wrong.</span></div></div>
+          <div class="step"><div><strong>Target liquidity or a fixed multiple.</strong><br><span>Default target logic is nearest liquidity, prior high/low, or an ATR-based objective.</span></div></div>
+        </div>
+      </article>
 
-{cleaned}
+      <aside class="card">
+        <h2>Execution Checklist</h2>
+        <div class="rule"><strong>Market and timeframe</strong><span>Confirm exactly what instrument and timeframe this applies to.</span></div>
+        <div class="rule"><strong>Entry trigger</strong><span>What must happen before you are allowed to click buy or sell?</span></div>
+        <div class="rule"><strong>Skip condition</strong><span>What makes the setup too late, too choppy, or invalid?</span></div>
+        <div class="rule"><strong>Risk placement</strong><span>Where does the trade idea become wrong?</span></div>
+        <div class="rule"><strong>First target</strong><span>Where is the nearest realistic liquidity or measured exit?</span></div>
+        <div class="chips">
+          <span class="chip">Scalp Assist</span>
+          <span class="chip">Trader Narration</span>
+          <span class="chip">Draft Rules</span>
+        </div>
+      </aside>
 
-## Strategy Logic Draft
+      <article class="card" style="grid-column: 1 / -1;">
+        <h2>Source Transcript</h2>
+        <div class="transcript">{escaped_notes}</div>
+      </article>
+    </section>
 
-1. Identify the market context first: trend direction, volatility, active session, and nearby liquidity.
-2. Wait for confirmation instead of predicting. The default confirmation is a reclaim of the prior candle high for longs or a rejection below the prior candle low for shorts.
-3. Trade only when the fast trend is aligned with the slow trend.
-4. Avoid low-volatility chop and unclear range conditions.
-5. Place the stop beyond the trigger candle or beyond the invalidation point described in the narration.
-6. Target the nearest obvious liquidity, prior high/low, or a defined ATR multiple.
-7. Skip the trade when the setup is late, extended, unclear, or contradicts the trader's spoken invalidation rule.
-
-## Execution Checklist
-
-- What is the market and timeframe?
-- Where is liquidity?
-- What must happen before entry?
-- What invalidates the idea?
-- Where is the stop?
-- Where is the first target?
-- Is the trade still clean after spread, volatility, and news risk?
-
-## Notes
-
-This brief is generated from the saved capture transcript. Chart-frame interpretation is the next system layer; confirm the visual rules against the recording before trading live.
+    <footer>This playbook is generated from your saved transcript. Chart-frame interpretation and full AI video review are the next system layer; verify the rules against the recording before using them live.</footer>
+  </main>
+</body>
+</html>
 """
+
+    @staticmethod
+    def _escape_html(value: str) -> str:
+        return (
+            str(value)
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace('"', "&quot;")
+            .replace("'", "&#039;")
+        )
 
     @staticmethod
     def _template(title: str, source_notes: str) -> str:
