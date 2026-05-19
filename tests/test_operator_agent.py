@@ -314,3 +314,14 @@ def test_root_route_serves_studio():
     assert root_response.status_code == 200
     assert "AstraCore Studio" in root_response.text
     assert "/static/studio.js" in root_response.text
+    assert "AstraCore Trading Command Center" not in root_response.text
+    assert "/static/app.js" not in root_response.text
+    assert root_response.headers["cache-control"] == "no-store"
+
+
+def test_old_dashboard_static_files_are_removed():
+    root = Path(__file__).resolve().parents[1]
+
+    assert not (root / "web" / "index.html").exists()
+    assert not (root / "web" / "app.js").exists()
+    assert not (root / "web" / "styles.css").exists()

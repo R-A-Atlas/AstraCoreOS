@@ -55,12 +55,20 @@ class PineStrategyRequest(BaseModel):
 
 @app.get("/")
 def index() -> FileResponse:
-    return FileResponse(WEB / "studio.html", media_type="text/html; charset=utf-8")
+    return FileResponse(
+        WEB / "studio.html",
+        media_type="text/html; charset=utf-8",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.get("/studio")
 def studio() -> FileResponse:
-    return FileResponse(WEB / "studio.html", media_type="text/html; charset=utf-8")
+    return FileResponse(
+        WEB / "studio.html",
+        media_type="text/html; charset=utf-8",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.get("/health")
