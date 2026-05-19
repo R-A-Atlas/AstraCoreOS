@@ -22,7 +22,7 @@
         </span>
         <span class="pill ready-pill">
           <span class="ready-dot"></span>
-          Codex linked
+          Local backend ready
         </span>
         <span id="studio-clock" class="clock">00:00:00</span>
         <button id="open-tray-btn" class="toolbar-btn" type="button" aria-controls="captures-tray">
@@ -32,7 +32,7 @@
       </nav>
     </header>
 
-    <section class="studio-stage" aria-label="Recording preview">
+    <section id="studio-stage" class="studio-stage" aria-label="Recording preview">
       <div class="preview-wrap">
         <div id="preview-frame" class="preview-frame">
           <video id="screen-preview" playsinline muted></video>
@@ -65,8 +65,8 @@
       <aside class="strategy-drawer" aria-label="Strategy builder">
         <div class="drawer-header">
           <div>
-            <p>Strategy Notes</p>
-            <h2>Pine Builder</h2>
+            <p>Strategy Exports</p>
+            <h2>Export Strategy</h2>
           </div>
           <button id="collapse-strategy-btn" class="icon-btn" type="button" aria-label="Collapse strategy panel">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
@@ -76,18 +76,21 @@
         <label for="strategy-name">Strategy name</label>
         <input id="strategy-name" type="text" value="AstraCore Scalp Assist" />
 
-        <label for="strategy-notes">Plain-English rules</label>
-        <textarea id="strategy-notes" rows="9" placeholder="Optional. Leave blank and AstraCore will use the latest capture transcript."></textarea>
+        <input id="strategy-notes" type="hidden" value="" />
+        <div class="source-card">
+          <strong>Source</strong>
+          <span>Latest saved capture transcript. Manual notes are intentionally hidden because the workflow is capture first.</span>
+        </div>
 
         <div class="export-grid" aria-label="Strategy export options">
           <button id="generate-pine-btn" class="primary-btn wide" type="button" data-export-type="pine">Pine Script</button>
           <button class="secondary-btn wide export-btn" type="button" data-export-type="mt5">MT5 / MQL5</button>
           <button class="secondary-btn wide export-btn" type="button" data-export-type="instructions">Visual Playbook</button>
         </div>
-        <div id="pine-result" class="result-box">Record a session, explain the setup, then choose one export. Visual Playbook creates a polished standalone HTML report.</div>
+        <div id="pine-result" class="result-box">Record a session, explain the setup, then choose one export. Current build uses the saved transcript through local backend code; AI video-frame analysis is the next layer.</div>
       </aside>
 
-      <button id="open-strategy-btn" class="floating-strategy-btn hidden" type="button">Strategy</button>
+      <button id="open-strategy-btn" class="floating-strategy-btn hidden" type="button">Exports</button>
 
       <div class="dock-wrap" aria-label="Recording controls">
         <div class="dock">

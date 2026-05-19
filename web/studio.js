@@ -28,6 +28,7 @@ const els = {
   sourceLabel: document.querySelector("#source-label"),
   resolutionHud: document.querySelector("#resolution-hud"),
   captionOverlay: document.querySelector("#caption-overlay"),
+  stage: document.querySelector("#studio-stage"),
   monitorStrip: document.querySelector("#monitor-strip"),
   connectDisplayBtn: document.querySelector("#connect-display-btn"),
   startSessionBtn: document.querySelector("#start-session-btn"),
@@ -547,8 +548,14 @@ function wireEvents() {
   els.exportBtns.forEach((button) => {
     button.addEventListener("click", () => generateStrategyExport(button.dataset.exportType || "pine"));
   });
-  els.openStrategyBtn.addEventListener("click", () => els.strategyDrawer.classList.add("open"));
-  els.collapseStrategyBtn.addEventListener("click", () => els.strategyDrawer.classList.remove("open"));
+  els.openStrategyBtn.addEventListener("click", () => {
+    els.stage.classList.remove("drawer-collapsed");
+    els.strategyDrawer.classList.add("open");
+  });
+  els.collapseStrategyBtn.addEventListener("click", () => {
+    els.stage.classList.add("drawer-collapsed");
+    els.strategyDrawer.classList.remove("open");
+  });
   window.addEventListener("keydown", (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "r" && !event.shiftKey) {
       event.preventDefault();

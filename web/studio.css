@@ -30,7 +30,7 @@ body {
 }
 
 body {
-  overflow: hidden;
+  overflow: auto;
   background:
     radial-gradient(circle at 50% -10%, rgba(167, 139, 250, 0.16), transparent 34rem),
     radial-gradient(circle at 50% 115%, rgba(124, 58, 237, 0.1), transparent 36rem),
@@ -194,14 +194,37 @@ svg {
 
 .studio-stage {
   flex: 1;
-  min-height: 0;
+  min-height: calc(100vh - 3.5rem);
   display: grid;
   grid-template-columns: minmax(0, 1fr) 22rem;
   grid-template-rows: minmax(0, 1fr) auto;
   gap: 0.75rem 1.2rem;
   padding: 2rem;
   position: relative;
-  overflow: auto;
+  overflow: visible;
+  transition: grid-template-columns 180ms ease;
+}
+
+.studio-stage.drawer-collapsed {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.studio-stage.drawer-collapsed .preview-wrap {
+  grid-column: 1;
+  width: min(100%, 96rem);
+}
+
+.studio-stage.drawer-collapsed .preview-frame {
+  width: min(100%, calc((100vh - 17rem) * 16 / 9));
+}
+
+.studio-stage.drawer-collapsed .strategy-drawer {
+  display: none;
+}
+
+.studio-stage.drawer-collapsed .floating-strategy-btn {
+  display: inline-flex !important;
+  align-items: center;
 }
 
 .preview-wrap {
@@ -214,7 +237,7 @@ svg {
 
 .preview-frame {
   position: relative;
-  width: min(100%, calc((100vh - 21rem) * 16 / 9));
+  width: min(100%, calc((100vh - 19rem) * 16 / 9));
   margin: 0 auto;
   aspect-ratio: 16 / 9;
   overflow: hidden;
@@ -505,6 +528,27 @@ textarea {
   line-height: 1.5;
 }
 
+.source-card {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.95rem 0;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.85rem;
+}
+
+.source-card strong {
+  color: var(--text);
+  font-size: 0.82rem;
+}
+
+.source-card span {
+  color: var(--text-muted);
+  line-height: 1.45;
+  font-size: 0.86rem;
+}
+
 input:focus,
 textarea:focus {
   border-color: rgba(167, 139, 250, 0.55);
@@ -530,7 +574,7 @@ textarea:focus {
 .floating-strategy-btn {
   position: fixed;
   right: 1rem;
-  bottom: 6.7rem;
+  bottom: 1.35rem;
   z-index: 4;
   height: 2.5rem;
   border: 1px solid rgba(167, 139, 250, 0.42);
@@ -777,6 +821,10 @@ textarea:focus {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto;
     padding: 1rem;
+  }
+
+  .studio-stage.drawer-collapsed .preview-frame {
+    width: 100%;
   }
 
   .preview-wrap,
