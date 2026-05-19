@@ -304,3 +304,17 @@ def test_studio_route_serves_focused_capture_ui():
     assert "AstraCore Studio" in response.text
     assert "Connect a display to begin" in response.text
     assert "/static/studio.js" in response.text
+
+
+def test_root_route_serves_studio_and_dashboard_keeps_old_ui():
+    client = TestClient(app)
+
+    root_response = client.get("/")
+    dashboard_response = client.get("/dashboard")
+
+    assert root_response.status_code == 200
+    assert "AstraCore Studio" in root_response.text
+    assert "/static/studio.js" in root_response.text
+    assert dashboard_response.status_code == 200
+    assert "AstraCore Trading Command Center" in dashboard_response.text
+    assert "/static/app.js" in dashboard_response.text

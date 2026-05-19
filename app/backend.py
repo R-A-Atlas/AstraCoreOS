@@ -55,6 +55,11 @@ class PineStrategyRequest(BaseModel):
 
 @app.get("/")
 def index() -> FileResponse:
+    return FileResponse(WEB / "studio.html", media_type="text/html; charset=utf-8")
+
+
+@app.get("/dashboard")
+def dashboard() -> FileResponse:
     return FileResponse(WEB / "index.html", media_type="text/html; charset=utf-8")
 
 
