@@ -2,6 +2,7 @@ from pathlib import Path
 
 from app.command_center import default_command_center_state
 from app.config import AppConfig
+from app.intel_runner import IntelRunner
 from app.notifications import notification_channels
 from app.operator_agent import OperatorAgent
 from app.skills_registry import skill_catalog
@@ -198,3 +199,22 @@ def test_notification_status_does_not_expose_secret_values(tmp_path: Path, monke
     assert channels[1]["configured"] is True
     assert "telegram-secret" not in str(channels)
     assert "sendgrid-secret" not in str(channels)
+
+
+def test_intel_runner_creates_skill_packet():
+    result = IntelRunner().run("daily_market_prep", "prep NQ before the open")
+    packet = result.packet
+
+    assert result.ok is True
+    assert result.skill_id == "daily_market_prep"
+    assert packet["agent"] == "trading_intel_skill_runner"
+    assert packet["data"]["skill_id"] == "daily_market_prep"
+    assert "market_data" in result.missing_tools
+
+
+def test_intel_runner_rejects_unknown_skill():
+    result = IntelRunner().run("missing_skill")
+
+    assert result.ok is False
+    assert result.packet == {}
+    assert "Unknown intel skill" in result.message

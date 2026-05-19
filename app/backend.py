@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from app.command_center import default_command_center_state
 from app.config import AppConfig
+from app.intel_runner import IntelRunner
 from app.notifications import notification_channels
 from app.operator_agent import OperatorAgent
 from app.skills_registry import skill_catalog
@@ -21,6 +22,7 @@ OUTPUTS = ROOT / "workspace" / "outputs"
 app = FastAPI(title="AstraCore OS", version="0.1.0")
 config = AppConfig(ROOT)
 agent = OperatorAgent(ROOT)
+intel_runner = IntelRunner()
 
 app.mount("/static", StaticFiles(directory=WEB), name="static")
 app.mount("/outputs", StaticFiles(directory=OUTPUTS), name="outputs")
@@ -29,6 +31,11 @@ app.mount("/outputs", StaticFiles(directory=OUTPUTS), name="outputs")
 class OperatorRequest(BaseModel):
     directive: str = Field(..., min_length=1, max_length=4000)
     deep_research: bool = False
+
+
+class IntelRunRequest(BaseModel):
+    skill_id: str = Field(..., min_length=1, max_length=100)
+    directive: str = Field("", max_length=4000)
 
 
 @app.get("/")
@@ -79,6 +86,11 @@ def intel_status() -> dict:
         **skill_catalog(),
         "notifications": [channel.to_dict() for channel in notification_channels()],
     }
+
+
+@app.post("/api/intel/run")
+def run_intel_skill(req: IntelRunRequest) -> dict:
+    return intel_runner.run(req.skill_id, req.directive).to_dict()
 
 
 @app.post("/api/operator")

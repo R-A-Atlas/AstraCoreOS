@@ -168,6 +168,7 @@ function renderCommandCenter(state) {
           <p>
             <span class="skill-status ${escapeHtml(task.status)}">${escapeHtml(task.status)}</span>
             ${escapeHtml(task.title)} · ${escapeHtml(task.cadence)}
+            <button class="inline-action run-skill-btn" data-skill-id="${escapeHtml(task.skill_id)}" type="button">Run</button>
           </p>
         `).join("") || "<p>No intel skills registered.</p>"}
       </section>
@@ -198,6 +199,25 @@ async function loadCommandCenter() {
     renderSteps([{ label: "Command center loaded", detail: "Market prep, watchlist, journal, and agent task lanes are visible." }]);
   } catch (error) {
     renderSteps([{ label: "Command center error", detail: error.message || "Failed to load command center." }]);
+  }
+}
+
+async function runIntelSkill(skillId) {
+  renderSteps([{ label: "Intel skill", detail: `Running ${skillId}.` }]);
+  try {
+    const response = await fetch("/api/intel/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ skill_id: skillId, directive: input.value.trim() })
+    });
+    const data = await response.json();
+    if (data.packet) renderContextPackets([data.packet]);
+    renderSteps([
+      { label: "Intel skill complete", detail: data.message || "Skill packet created." },
+      { label: "Missing tools", detail: (data.missing_tools || []).join(", ") || "none" }
+    ]);
+  } catch (error) {
+    renderSteps([{ label: "Intel skill error", detail: error.message || "Failed to run skill." }]);
   }
 }
 
@@ -304,6 +324,11 @@ document.getElementById("clear-visor").addEventListener("click", () => {
 });
 memoryBtn.addEventListener("click", loadMemory);
 commandCenterBtn.addEventListener("click", loadCommandCenter);
+displayArea.addEventListener("click", event => {
+  const button = event.target.closest(".run-skill-btn");
+  if (!button) return;
+  runIntelSkill(button.dataset.skillId);
+});
 loadCommandCenter();
 loadConfigStatus();
 

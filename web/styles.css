@@ -256,6 +256,21 @@ textarea:focus { border-color: var(--line-strong); }
   cursor: pointer;
 }
 #send-btn:hover, #clear-visor:hover { background: rgba(251,191,36,.2); }
+.inline-action {
+  margin-left: 8px;
+  border: 1px solid rgba(251,191,36,.24);
+  background: rgba(251,191,36,.08);
+  color: var(--gold);
+  border-radius: 999px;
+  padding: 2px 7px;
+  cursor: pointer;
+  font-family: "Space Mono", ui-monospace, monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+.inline-action:hover {
+  background: rgba(251,191,36,.16);
+}
 
 .visor {
   position: relative;
