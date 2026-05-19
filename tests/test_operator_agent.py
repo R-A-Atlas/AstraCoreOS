@@ -277,6 +277,22 @@ def test_capture_studio_saves_webm_capture(tmp_path: Path):
     assert recent[-1].transcript_status == "pending"
 
 
+def test_capture_studio_saves_transcript_sidecar(tmp_path: Path):
+    studio = CaptureStudio(tmp_path)
+
+    session = studio.save_capture(
+        b"fake-webm-data",
+        "my narrated review.webm",
+        "I would enter after reclaiming the prior candle high.",
+    )
+    transcript_path = Path(session.transcript_path)
+
+    assert session.transcript_status == "complete"
+    assert session.transcript_filename.endswith(".txt")
+    assert transcript_path.exists()
+    assert "reclaiming the prior candle high" in transcript_path.read_text(encoding="utf-8")
+
+
 def test_pine_generator_creates_clean_strategy_file(tmp_path: Path):
     generator = PineStrategyGenerator(tmp_path)
 

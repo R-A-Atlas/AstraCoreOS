@@ -167,17 +167,21 @@ def recent_memory(limit: int = 10) -> dict:
 
 
 @app.post("/api/captures")
-async def save_capture(request: Request, filename: str = "") -> dict:
+async def save_capture(request: Request, filename: str = "", transcript: str = "") -> dict:
     raw = await request.body()
     try:
-        session = capture_studio.save_capture(raw, filename)
+        session = capture_studio.save_capture(raw, filename, transcript)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    transcript_download_url = (
+        f"/captures/{session.transcript_filename}" if session.transcript_filename else ""
+    )
     return {
         "ok": True,
         "capture": {
             **session.to_dict(),
             "download_url": f"/captures/{session.filename}",
+            "transcript_download_url": transcript_download_url,
         },
     }
 
@@ -191,6 +195,9 @@ def list_captures(limit: int = 20) -> dict:
             {
                 **session.to_dict(),
                 "download_url": f"/captures/{session.filename}",
+                "transcript_download_url": (
+                    f"/captures/{session.transcript_filename}" if session.transcript_filename else ""
+                ),
             }
             for session in capture_studio.recent_captures(safe_limit)
         ],

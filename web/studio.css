@@ -356,6 +356,26 @@ svg {
   padding: 0.48rem 0.7rem;
 }
 
+.caption-overlay {
+  position: absolute;
+  left: 50%;
+  bottom: 1.1rem;
+  z-index: 3;
+  width: min(86%, 44rem);
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 0.85rem;
+  background: rgba(0, 0, 0, 0.68);
+  color: #fff;
+  padding: 0.72rem 0.9rem;
+  text-align: center;
+  line-height: 1.35;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-shadow: 0 1px 0 #000;
+  backdrop-filter: blur(14px);
+}
+
 .status-dot {
   background: var(--brand);
   box-shadow: 0 0 0.8rem var(--brand);
@@ -575,6 +595,14 @@ textarea:focus {
   height: 2rem;
 }
 
+.transcript-status {
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  padding: 0 0.35rem;
+  white-space: nowrap;
+}
+
 .timer {
   color: var(--text);
   font-family: var(--mono);
@@ -631,6 +659,10 @@ textarea:focus {
   padding: 0.6rem;
 }
 
+.capture-item-wrap {
+  border-radius: 0.85rem;
+}
+
 .capture-item {
   width: 100%;
   display: grid;
@@ -648,6 +680,19 @@ textarea:focus {
 .capture-item:hover {
   background: rgba(255, 255, 255, 0.045);
   border-color: var(--line);
+}
+
+.transcript-link {
+  display: inline-flex;
+  margin: 0 0 0.45rem 5.6rem;
+  color: var(--brand);
+  font-size: 0.76rem;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.transcript-link:hover {
+  text-decoration: underline;
 }
 
 .capture-thumb {
@@ -789,6 +834,7 @@ textarea:focus {
   }
 
   #waveform,
+  .transcript-status,
   .dock-divider {
     display: none;
   }

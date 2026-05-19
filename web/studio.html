@@ -56,6 +56,7 @@
             <span id="source-label">Screen</span>
           </div>
           <div id="resolution-hud" class="resolution-hud hidden">0x0</div>
+          <div id="caption-overlay" class="caption-overlay hidden">Live transcript will appear here.</div>
         </div>
 
         <div id="monitor-strip" class="monitor-strip" aria-label="Display choices"></div>
@@ -101,6 +102,7 @@
           <button id="mic-btn" class="dock-btn icon" type="button" aria-label="Toggle microphone">
             <svg id="mic-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
           </button>
+          <span id="transcript-status" class="transcript-status">transcript idle</span>
           <canvas id="waveform" width="120" height="34"></canvas>
           <span class="dock-divider"></span>
           <span id="session-timer" class="timer">00:00</span>

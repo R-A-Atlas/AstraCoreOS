@@ -17,6 +17,8 @@ class CaptureSession:
     created_at: str
     transcript_status: str
     analysis_status: str
+    transcript_filename: str = ""
+    transcript_path: str = ""
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -27,21 +29,31 @@ class CaptureStudio:
         self.capture_dir = root / "workspace" / "captures"
         self.index_path = self.capture_dir / "capture_sessions.jsonl"
 
-    def save_capture(self, raw: bytes, filename: str | None = None) -> CaptureSession:
+    def save_capture(self, raw: bytes, filename: str | None = None, transcript: str = "") -> CaptureSession:
         if not raw:
             raise ValueError("Capture file is empty.")
         self.capture_dir.mkdir(parents=True, exist_ok=True)
         safe_name = self._safe_filename(filename)
         path = self.capture_dir / safe_name
         path.write_bytes(raw)
+        transcript_filename = ""
+        transcript_path = ""
+        transcript = transcript.strip()
+        if transcript:
+            transcript_filename = f"{Path(safe_name).stem}.txt"
+            transcript_file = self.capture_dir / transcript_filename
+            transcript_file.write_text(transcript + "\n", encoding="utf-8")
+            transcript_path = str(transcript_file)
         session = CaptureSession(
             id=str(uuid4()),
             filename=safe_name,
             path=str(path),
             size_bytes=len(raw),
             created_at=datetime.now(timezone.utc).isoformat(),
-            transcript_status="pending",
+            transcript_status="complete" if transcript else "pending",
             analysis_status="pending",
+            transcript_filename=transcript_filename,
+            transcript_path=transcript_path,
         )
         with self.index_path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(session.to_dict()) + "\n")
@@ -57,7 +69,10 @@ class CaptureStudio:
                 if not line:
                     continue
                 try:
-                    sessions.append(CaptureSession(**json.loads(line)))
+                    payload = json.loads(line)
+                    payload.setdefault("transcript_filename", "")
+                    payload.setdefault("transcript_path", "")
+                    sessions.append(CaptureSession(**payload))
                 except (json.JSONDecodeError, TypeError):
                     continue
         return sessions[-limit:]

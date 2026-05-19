@@ -11,6 +11,9 @@ const state = {
   timerId: null,
   waveformId: null,
   audioContext: null,
+  transcriptFinal: "",
+  transcriptInterim: "",
+  recognition: null,
 };
 
 const els = {
@@ -24,6 +27,7 @@ const els = {
   liveDot: document.querySelector("#live-dot"),
   sourceLabel: document.querySelector("#source-label"),
   resolutionHud: document.querySelector("#resolution-hud"),
+  captionOverlay: document.querySelector("#caption-overlay"),
   monitorStrip: document.querySelector("#monitor-strip"),
   connectDisplayBtn: document.querySelector("#connect-display-btn"),
   startSessionBtn: document.querySelector("#start-session-btn"),
@@ -32,6 +36,7 @@ const els = {
   pauseIcon: document.querySelector("#pause-icon"),
   micBtn: document.querySelector("#mic-btn"),
   micIcon: document.querySelector("#mic-icon"),
+  transcriptStatus: document.querySelector("#transcript-status"),
   waveform: document.querySelector("#waveform"),
   timer: document.querySelector("#session-timer"),
   tray: document.querySelector("#captures-tray"),
@@ -81,6 +86,7 @@ function setRecordingUi() {
 function setMicUi() {
   els.micBtn.classList.toggle("muted", !state.micEnabled);
   els.micIcon.innerHTML = state.micEnabled ? icons.mic : icons.micOff;
+  updateTranscriptStatus();
 }
 
 function setPreview(stream) {
@@ -95,6 +101,7 @@ function setPreview(stream) {
   els.sourceLabel.textContent = track.label || "Screen";
   els.resolutionHud.textContent = `${settings.width || 0}x${settings.height || 0} · ${Math.round(settings.frameRate || 0)}fps`;
   track.onended = stopSession;
+  els.preview.play().catch(() => {});
 }
 
 async function requestDisplay() {
@@ -154,6 +161,9 @@ async function startSession() {
       ? "video/webm;codecs=vp9,opus"
       : "video/webm";
     state.chunks = [];
+    state.transcriptFinal = "";
+    state.transcriptInterim = "";
+    updateCaptionOverlay();
     state.mediaRecorder = new MediaRecorder(stream, { mimeType });
     state.mediaRecorder.ondataavailable = (event) => {
       if (event.data.size > 0) {
@@ -166,6 +176,7 @@ async function startSession() {
     state.paused = false;
     state.seconds = 0;
     startTimer();
+    startSpeechRecognition();
     setRecordingUi();
   } catch (error) {
     els.pineResult.textContent = error.message || "Could not start recording.";
@@ -198,6 +209,7 @@ function pauseSession() {
 
 function stopSession() {
   window.clearInterval(state.timerId);
+  stopSpeechRecognition();
   if (state.mediaRecorder && state.mediaRecorder.state !== "inactive") {
     state.mediaRecorder.stop();
   } else {
@@ -210,6 +222,7 @@ function stopSession() {
 
 async function saveRecording() {
   const blob = new Blob(state.chunks, { type: "video/webm" });
+  const transcript = getTranscriptText();
   cleanupStreams();
   if (!blob.size) {
     els.pineResult.textContent = "Recording stopped, but no video data was captured.";
@@ -219,7 +232,11 @@ async function saveRecording() {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const filename = `trade-review-${stamp}.webm`;
   try {
-    const response = await fetch(`/api/captures?filename=${encodeURIComponent(filename)}`, {
+    const params = new URLSearchParams({ filename });
+    if (transcript) {
+      params.set("transcript", transcript);
+    }
+    const response = await fetch(`/api/captures?${params.toString()}`, {
       method: "POST",
       headers: { "Content-Type": "video/webm" },
       body: blob,
@@ -228,7 +245,13 @@ async function saveRecording() {
       throw new Error(`Save failed with ${response.status}`);
     }
     const data = await response.json();
-    els.pineResult.innerHTML = `Capture saved: <a href="${data.capture.download_url}" download>${data.capture.filename}</a>`;
+    const transcriptLink = data.capture.transcript_download_url
+      ? `<br><a href="${data.capture.transcript_download_url}" download>Download transcript</a>`
+      : "";
+    els.pineResult.innerHTML = `Capture saved: <a href="${data.capture.download_url}" download>${data.capture.filename}</a>${transcriptLink}`;
+    if (transcript && !els.strategyNotes.value.trim()) {
+      els.strategyNotes.value = transcript;
+    }
     await loadCaptures();
     openTray();
   } catch (error) {
@@ -249,7 +272,98 @@ function cleanupStreams() {
   els.previewEmpty.classList.remove("hidden");
   els.previewHud.classList.add("hidden");
   els.resolutionHud.classList.add("hidden");
+  els.captionOverlay.classList.add("hidden");
   stopWaveform();
+}
+
+function getSpeechRecognitionCtor() {
+  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
+function startSpeechRecognition() {
+  const Recognition = getSpeechRecognitionCtor();
+  if (!Recognition || !state.micEnabled) {
+    updateTranscriptStatus();
+    updateCaptionOverlay();
+    return;
+  }
+  const recognition = new Recognition();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = "en-US";
+  recognition.onresult = (event) => {
+    let interim = "";
+    for (let i = event.resultIndex; i < event.results.length; i += 1) {
+      const text = event.results[i][0].transcript.trim();
+      if (event.results[i].isFinal) {
+        state.transcriptFinal = `${state.transcriptFinal} ${text}`.trim();
+      } else {
+        interim = `${interim} ${text}`.trim();
+      }
+    }
+    state.transcriptInterim = interim;
+    updateCaptionOverlay();
+    updateTranscriptStatus();
+  };
+  recognition.onerror = () => updateTranscriptStatus("transcript paused");
+  recognition.onend = () => {
+    if (state.recording && !state.paused && state.micEnabled) {
+      try {
+        recognition.start();
+      } catch {
+        updateTranscriptStatus("transcript paused");
+      }
+    }
+  };
+  state.recognition = recognition;
+  try {
+    recognition.start();
+  } catch {
+    updateTranscriptStatus("transcript unavailable");
+  }
+  updateTranscriptStatus();
+}
+
+function stopSpeechRecognition() {
+  if (state.recognition) {
+    state.recognition.onend = null;
+    try {
+      state.recognition.stop();
+    } catch {}
+  }
+  state.recognition = null;
+  state.transcriptInterim = "";
+  updateTranscriptStatus();
+  updateCaptionOverlay();
+}
+
+function getTranscriptText() {
+  return `${state.transcriptFinal} ${state.transcriptInterim}`.trim();
+}
+
+function updateCaptionOverlay() {
+  const transcript = getTranscriptText();
+  if (!transcript) {
+    els.captionOverlay.classList.add("hidden");
+    els.captionOverlay.textContent = "Live transcript will appear here.";
+    return;
+  }
+  els.captionOverlay.classList.remove("hidden");
+  els.captionOverlay.textContent = transcript.slice(-220);
+}
+
+function updateTranscriptStatus(forcedText = "") {
+  if (forcedText) {
+    els.transcriptStatus.textContent = forcedText;
+  } else if (!state.micEnabled) {
+    els.transcriptStatus.textContent = "mic muted";
+  } else if (!getSpeechRecognitionCtor()) {
+    els.transcriptStatus.textContent = "browser transcript off";
+  } else if (state.recording) {
+    els.transcriptStatus.textContent = "live transcript";
+  } else {
+    els.transcriptStatus.textContent = "transcript ready";
+  }
 }
 
 function startWaveform() {
@@ -323,7 +437,12 @@ async function loadCaptures() {
       els.capturesList.innerHTML = '<div class="result-box">No captures saved yet.</div>';
       return;
     }
-    els.capturesList.innerHTML = captures.reverse().map((capture) => `
+    els.capturesList.innerHTML = captures.reverse().map((capture) => {
+      const transcriptLink = capture.transcript_download_url
+        ? `<a class="transcript-link" href="${capture.transcript_download_url}" download>Transcript</a>`
+        : "";
+      return `
+      <div class="capture-item-wrap">
       <a class="capture-item" href="${capture.download_url}" download>
         <span class="capture-thumb"></span>
         <span>
@@ -331,7 +450,10 @@ async function loadCaptures() {
           <span class="capture-meta">${formatBytes(capture.size_bytes)} · ${new Date(capture.created_at).toLocaleString()}</span>
         </span>
       </a>
-    `).join("");
+      ${transcriptLink}
+      </div>
+    `;
+    }).join("");
   } catch {
     els.capturesList.innerHTML = '<div class="result-box">Could not load captures.</div>';
   }
@@ -390,7 +512,9 @@ function renderMonitorStrip() {
       <small>${screen.width}x${screen.height}</small>
     </button>
   `).join("") + '<button class="monitor-chip" type="button" id="pick-window-btn">Pick window...</button>';
-  document.querySelector("#pick-window-btn").addEventListener("click", requestDisplay);
+  els.monitorStrip.querySelectorAll(".monitor-chip").forEach((button) => {
+    button.addEventListener("click", requestDisplay);
+  });
 }
 
 function formatBytes(bytes) {
