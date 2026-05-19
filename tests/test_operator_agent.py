@@ -6,6 +6,7 @@ from app.config import AppConfig
 from app.intel_runner import IntelRunner
 from app.notifications import notification_channels
 from app.operator_agent import OperatorAgent
+from app.pine_generator import PineStrategyGenerator
 from app.skills_registry import skill_catalog
 from app.tradingview import TradingViewBridge
 
@@ -271,3 +272,21 @@ def test_capture_studio_saves_webm_capture(tmp_path: Path):
     assert Path(session.path).exists()
     assert recent[-1].id == session.id
     assert recent[-1].transcript_status == "pending"
+
+
+def test_pine_generator_creates_clean_strategy_file(tmp_path: Path):
+    generator = PineStrategyGenerator(tmp_path)
+
+    artifact = generator.generate_scalp_assist(
+        "I want NQ scalp entries after reclaiming prior candle high with trend behind me.",
+        "My NQ Scalp",
+    )
+    path = Path(artifact.path)
+    content = path.read_text(encoding="utf-8")
+
+    assert path.exists()
+    assert path.suffix == ".pine"
+    assert "//@version=6" in content
+    assert "strategy.entry" in content
+    assert "alert(" in content
+    assert "plotshape" in content

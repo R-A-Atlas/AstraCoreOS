@@ -13,6 +13,7 @@ from app.capture_studio import CaptureStudio
 from app.intel_runner import IntelRunner
 from app.notifications import notification_channels
 from app.operator_agent import OperatorAgent
+from app.pine_generator import PineStrategyGenerator
 from app.skills_registry import skill_catalog
 from app.tradingview import TradingViewBridge
 
@@ -30,6 +31,7 @@ agent = OperatorAgent(ROOT)
 intel_runner = IntelRunner()
 tradingview_bridge = TradingViewBridge(ROOT)
 capture_studio = CaptureStudio(ROOT)
+pine_generator = PineStrategyGenerator(ROOT)
 
 app.mount("/static", StaticFiles(directory=WEB), name="static")
 app.mount("/outputs", StaticFiles(directory=OUTPUTS), name="outputs")
@@ -44,6 +46,11 @@ class OperatorRequest(BaseModel):
 class IntelRunRequest(BaseModel):
     skill_id: str = Field(..., min_length=1, max_length=100)
     directive: str = Field("", max_length=4000)
+
+
+class PineStrategyRequest(BaseModel):
+    name: str = Field("AstraCore Scalp Assist", max_length=100)
+    notes: str = Field("", max_length=12000)
 
 
 @app.get("/")
@@ -174,4 +181,16 @@ def list_captures(limit: int = 20) -> dict:
             }
             for session in capture_studio.recent_captures(safe_limit)
         ],
+    }
+
+
+@app.post("/api/strategies/pine")
+def generate_pine_strategy(req: PineStrategyRequest) -> dict:
+    artifact = pine_generator.generate_scalp_assist(req.notes, req.name)
+    return {
+        "ok": True,
+        "strategy": {
+            **artifact.to_dict(),
+            "download_url": f"/outputs/{artifact.filename}",
+        },
     }

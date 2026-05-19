@@ -149,10 +149,17 @@ function renderCaptureStudio(captures = []) {
           : "<span>No capture sessions saved yet.</span>"
       }
     </div>
+    <div class="strategy-lab">
+      <div class="packet-kind">Pine Strategy Lab</div>
+      <textarea id="strategy-notes" rows="5" placeholder="Describe the setup from your recording: what you see, entry trigger, invalidation, stop, target, and when not to trade..."></textarea>
+      <button class="download-btn" id="generate-pine-btn" type="button">Generate Pine v6 Strategy</button>
+      <div id="pine-output" class="artifact-path">No strategy generated yet.</div>
+    </div>
   `;
   displayArea.prepend(card);
   card.querySelector("#start-capture-btn").addEventListener("click", () => startCapture(card));
   card.querySelector("#stop-capture-btn").addEventListener("click", () => stopCapture(card));
+  card.querySelector("#generate-pine-btn").addEventListener("click", () => generatePineStrategy(card));
 }
 
 async function loadCaptureStudio() {
@@ -242,6 +249,29 @@ async function uploadCapture(card) {
     captureRecorder = null;
     captureStream = null;
     captureChunks = [];
+  }
+}
+
+async function generatePineStrategy(card) {
+  const notes = card.querySelector("#strategy-notes").value.trim();
+  const output = card.querySelector("#pine-output");
+  output.textContent = "generating";
+  try {
+    const response = await fetch("/api/strategies/pine", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "AstraCore Scalp Assist",
+        notes
+      })
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.detail || "Pine generation failed.");
+    output.innerHTML = `generated · <a href="${escapeHtml(data.strategy.download_url)}" download>${escapeHtml(data.strategy.filename)}</a>`;
+    renderSteps([{ label: "Pine strategy generated", detail: data.strategy.filename }]);
+  } catch (error) {
+    output.textContent = `generation failed: ${error.message || error}`;
+    renderSteps([{ label: "Pine generation failed", detail: error.message || "Request failed." }]);
   }
 }
 

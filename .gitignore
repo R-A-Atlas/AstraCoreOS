@@ -3,6 +3,7 @@ __pycache__/
 .pytest_cache/
 .env
 workspace/outputs/*.docx
+workspace/outputs/*.pine
 workspace/memory/*.jsonl
 workspace/integrations/*.jsonl
 workspace/captures/*.webm
