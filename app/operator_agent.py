@@ -31,7 +31,7 @@ class OperatorAgent:
         self.root = root
         self.outputs_dir = root / "workspace" / "outputs"
         self.memory_path = root / "workspace" / "memory" / "events.jsonl"
-        self.router = ModelRouter()
+        self.router = ModelRouter(root)
         self.business_docs = BusinessDocumentationAgent()
         self.synthesizer = AnswerSynthesizer()
 

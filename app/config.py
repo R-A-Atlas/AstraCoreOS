@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 
-def load_env_file(path: Path) -> None:
+def load_env_file(path: Path, override: bool = True) -> None:
     if not path.exists():
         return
     for raw_line in path.read_text(encoding="utf-8").splitlines():
@@ -16,7 +16,7 @@ def load_env_file(path: Path) -> None:
         key, value = line.split("=", 1)
         key = key.strip()
         value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
+        if key and (override or key not in os.environ):
             os.environ[key] = value
 
 

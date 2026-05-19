@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
+from pathlib import Path
 
 from app.config import env_bool, env_int, load_env_file
 
@@ -23,8 +24,9 @@ class ModelRouter:
     without rewriting the agent.
     """
 
-    def __init__(self) -> None:
-        load_env_file(__import__("pathlib").Path(__file__).resolve().parents[1] / ".env")
+    def __init__(self, root: Path | None = None) -> None:
+        if root is not None:
+            load_env_file(root / ".env")
         self.provider = os.getenv("ASTRA_MODEL_PROVIDER", "local").strip().lower() or "local"
         self.paid_enabled = env_bool("ENABLE_PAID_MODELS", False)
         self.max_paid_calls = env_int("ASTRA_MAX_PAID_CALLS_PER_DAY", 0)
