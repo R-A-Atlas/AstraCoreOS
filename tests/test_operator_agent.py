@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from app.operator_agent import OperatorAgent
+from app.config import AppConfig
 
 
 def test_mobile_detailing_docx_created(tmp_path: Path):
@@ -87,3 +88,20 @@ def test_business_documentation_memory_can_be_read_back(tmp_path: Path):
     assert "cleaning business" in memory[0]["directive"]
     assert memory[0]["context_packets"][0]["agent"] == "business_documentation_agent"
     assert memory[0]["artifact_path"].endswith(".docx")
+
+
+def test_config_status_does_not_expose_secret_values(tmp_path: Path):
+    env = tmp_path / ".env"
+    env.write_text(
+        "GEMINI_API_KEY=real-secret\n"
+        "SUPABASE_URL=https://example.supabase.co\n"
+        "SUPABASE_ANON_KEY=anon-secret\n",
+        encoding="utf-8",
+    )
+
+    status = AppConfig(tmp_path).safe_status()
+
+    assert status["providers"][0]["provider"] == "gemini"
+    assert status["providers"][0]["configured"] is True
+    assert "real-secret" not in str(status)
+    assert status["supabase_configured"] is True

@@ -130,6 +130,46 @@ async function loadMemory() {
   }
 }
 
+function renderConfigStatus(status) {
+  const providers = status.providers || [];
+  const card = document.createElement("div");
+  card.className = "memory-card";
+  card.innerHTML = `
+    <div class="packet-kind">Config Status</div>
+    <div class="artifact-title">${escapeHtml(status.project || "AstraCoreOS")}</div>
+    <div class="packet-meta">
+      <span>${escapeHtml(status.active_provider || "local")}</span>
+      <span>${status.paid_models_enabled ? "paid on" : "paid off"}</span>
+      <span>${escapeHtml(status.environment || "development")}</span>
+    </div>
+    <div class="packet-list">
+      <b>Providers</b>
+      ${providers.map(provider => `<span>${escapeHtml(provider.provider)}: ${provider.configured ? "configured" : "missing key"} / ${escapeHtml(provider.default_model)}</span>`).join("")}
+    </div>
+    <div class="packet-list">
+      <b>Services</b>
+      <span>supabase: ${status.supabase_configured ? "configured" : "missing"}</span>
+      <span>google oauth: ${status.google_oauth_configured ? "configured" : "missing"}</span>
+      <span>github token: ${status.github_token_configured ? "configured" : "not needed"}</span>
+      <span>email: ${status.email_configured ? "configured" : "off"}</span>
+    </div>
+  `;
+  displayArea.prepend(card);
+}
+
+async function loadConfigStatus() {
+  try {
+    const response = await fetch("/api/config/status");
+    const data = await response.json();
+    renderConfigStatus(data.status || {});
+    if (data.status) {
+      providerStatus.textContent = `model: ${data.status.active_provider} / paid ${data.status.paid_models_enabled ? "on" : "off"}`;
+    }
+  } catch {
+    providerStatus.textContent = "model: config unavailable";
+  }
+}
+
 async function sendDirective() {
   const directive = input.value.trim();
   if (!directive) return;
@@ -179,6 +219,7 @@ document.getElementById("clear-visor").addEventListener("click", () => {
   renderSteps([{ label: "Cleared", detail: "Primary visor is empty." }]);
 });
 memoryBtn.addEventListener("click", loadMemory);
+loadConfigStatus();
 
 const canvas = document.getElementById("orbitalBrainCanvas");
 const ctx = canvas.getContext("2d");

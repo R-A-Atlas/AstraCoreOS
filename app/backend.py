@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from app.config import AppConfig
 from app.operator_agent import OperatorAgent
 
 
@@ -15,6 +16,7 @@ WEB = ROOT / "web"
 OUTPUTS = ROOT / "workspace" / "outputs"
 
 app = FastAPI(title="AstraCore OS", version="0.1.0")
+config = AppConfig(ROOT)
 agent = OperatorAgent(ROOT)
 
 app.mount("/static", StaticFiles(directory=WEB), name="static")
@@ -32,11 +34,21 @@ def index() -> FileResponse:
 
 @app.get("/health")
 def health() -> dict:
+    status = config.safe_status()
     return {
         "ok": True,
         "project": "AstraCore OS",
-        "cost_mode": "local_first",
+        "cost_mode": "paid_enabled" if status["paid_models_enabled"] else "local_first",
         "outputs_dir": str(OUTPUTS),
+        "active_provider": status["active_provider"],
+    }
+
+
+@app.get("/api/config/status")
+def config_status() -> dict:
+    return {
+        "ok": True,
+        "status": config.safe_status(),
     }
 
 

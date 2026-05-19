@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 import os
 
+from app.config import env_bool, env_int, load_env_file
+
 
 @dataclass(frozen=True)
 class ModelDecision:
@@ -22,11 +24,13 @@ class ModelRouter:
     """
 
     def __init__(self) -> None:
-        self.mode = os.getenv("ASTRACORE_MODEL_MODE", "local_first").strip().lower()
-        self.max_paid_calls = int(os.getenv("ASTRACORE_MAX_PAID_CALLS_PER_DAY", "0") or "0")
+        load_env_file(__import__("pathlib").Path(__file__).resolve().parents[1] / ".env")
+        self.provider = os.getenv("ASTRA_MODEL_PROVIDER", "local").strip().lower() or "local"
+        self.paid_enabled = env_bool("ENABLE_PAID_MODELS", False)
+        self.max_paid_calls = env_int("ASTRA_MAX_PAID_CALLS_PER_DAY", 0)
 
     def decide(self, task_type: str, complexity: str = "low") -> ModelDecision:
-        if self.mode == "local_first" or self.max_paid_calls <= 0:
+        if self.provider == "local" or not self.paid_enabled or self.max_paid_calls <= 0:
             return ModelDecision(
                 provider="local",
                 model="local-tools-v0",
@@ -36,9 +40,33 @@ class ModelRouter:
             )
 
         if complexity == "high":
-            return ModelDecision("openai", "gpt-5.2", "High complexity reasoning lane.", 0.02, True)
+            return ModelDecision(
+                os.getenv("ASTRA_TIER3_PROVIDER", "openai"),
+                os.getenv("OPENAI_MODEL_REASONING", "gpt-5.5"),
+                "High complexity reasoning lane.",
+                0.02,
+                True,
+            )
         if task_type in {"research", "web"}:
-            return ModelDecision("gemini", "gemini-2.5-flash", "Cheap web/research lane.", 0.005, True)
+            return ModelDecision(
+                os.getenv("ASTRA_TIER2_PROVIDER", "gemini"),
+                os.getenv("GEMINI_MODEL_DEFAULT", "gemini-2.5-flash"),
+                "Cheap web/research lane.",
+                0.005,
+                True,
+            )
         if task_type == "coding":
-            return ModelDecision("deepseek", "deepseek-v4-flash", "Low-cost coding lane.", 0.003, True)
-        return ModelDecision("local", "local-tools-v0", "Local route remains sufficient.", 0.0, False)
+            return ModelDecision(
+                "deepseek",
+                os.getenv("DEEPSEEK_MODEL_DEFAULT", "deepseek-v4-flash"),
+                "Low-cost coding lane.",
+                0.003,
+                True,
+            )
+        return ModelDecision(
+            self.provider,
+            os.getenv(f"{self.provider.upper()}_MODEL", os.getenv("GEMINI_MODEL_DEFAULT", "gemini-2.5-flash")),
+            "Paid model route selected by configuration.",
+            0.005,
+            True,
+        )
