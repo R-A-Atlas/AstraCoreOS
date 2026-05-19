@@ -105,3 +105,16 @@ def test_config_status_does_not_expose_secret_values(tmp_path: Path):
     assert status["providers"][0]["configured"] is True
     assert "real-secret" not in str(status)
     assert status["supabase_configured"] is True
+
+
+def test_paid_models_stay_local_when_disabled(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
+    monkeypatch.setenv("ASTRA_MODEL_PROVIDER", "gemini")
+    monkeypatch.setenv("ENABLE_PAID_MODELS", "false")
+    monkeypatch.setenv("ASTRA_MAX_PAID_CALLS_PER_DAY", "10")
+    agent = OperatorAgent(tmp_path)
+
+    result = agent.run("Make a simple proposal for a local web design service business.")
+
+    assert result.model["provider"] == "local"
+    assert result.model["paid_call_allowed"] is False

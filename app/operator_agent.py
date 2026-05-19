@@ -96,7 +96,7 @@ class OperatorAgent:
                 }
             )
         artifact_titles = [item["title"] for item in artifacts]
-        message = self.synthesizer.synthesize(directive, [packet], artifact_titles)
+        message = self.synthesizer.synthesize(directive, [packet], artifact_titles, decision)
         memory = [
             packet.summary,
             f"First active agent: {packet.agent}.",
