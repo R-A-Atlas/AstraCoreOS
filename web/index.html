@@ -50,12 +50,10 @@
         <div class="composer">
           <textarea id="directive-input" rows="2" placeholder="Issue a directive..."></textarea>
           <div class="composer-row">
-            <div class="mode-pills">
-              <span class="pill active">Normal</span>
-              <span class="pill">Build</span>
-              <span class="pill">Research</span>
-              <span class="pill">Deep</span>
-            </div>
+            <label class="deep-toggle" title="Ask AstraCore to use the deepest research workflow when it is available.">
+              <input id="deep-research-toggle" type="checkbox" />
+              <span>Deep research</span>
+            </label>
             <button id="send-btn">Send</button>
           </div>
         </div>

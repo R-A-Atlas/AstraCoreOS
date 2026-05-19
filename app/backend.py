@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -25,6 +25,7 @@ app.mount("/outputs", StaticFiles(directory=OUTPUTS), name="outputs")
 
 class OperatorRequest(BaseModel):
     directive: str = Field(..., min_length=1, max_length=4000)
+    deep_research: bool = False
 
 
 @app.get("/")
@@ -56,6 +57,15 @@ def config_status() -> dict:
 def run_operator(req: OperatorRequest) -> dict:
     result = agent.run(req.directive)
     return result.__dict__
+
+
+@app.get("/api/download/{filename}")
+def download_output(filename: str) -> FileResponse:
+    path = (OUTPUTS / filename).resolve()
+    outputs_root = OUTPUTS.resolve()
+    if outputs_root not in path.parents or not path.exists() or not path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(path, filename=path.name)
 
 
 @app.get("/api/memory")

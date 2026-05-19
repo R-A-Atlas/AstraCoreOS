@@ -89,7 +89,7 @@ class OperatorAgent:
                     "kind": artifact.kind,
                     "summary": artifact.summary,
                     "path": str(artifact.path),
-                    "download_url": f"/outputs/{artifact.path.name}",
+                    "download_url": f"/api/download/{artifact.path.name}",
                 }
             )
         artifact_titles = [item["title"] for item in artifacts]

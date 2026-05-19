@@ -5,6 +5,7 @@ const displayArea = document.getElementById("active-display-area");
 const activitySteps = document.getElementById("activity-steps");
 const providerStatus = document.getElementById("provider-status");
 const memoryBtn = document.getElementById("memory-btn");
+const deepResearchToggle = document.getElementById("deep-research-toggle");
 
 function escapeHtml(value) {
   return String(value)
@@ -55,7 +56,7 @@ function renderArtifacts(artifacts) {
       <div class="artifact-title">${escapeHtml(artifact.title || "Untitled")}</div>
       <div class="artifact-summary">${escapeHtml(artifact.summary || "")}</div>
       <div class="artifact-path">${escapeHtml(artifact.path || "")}</div>
-      ${artifact.download_url ? `<a href="${escapeHtml(artifact.download_url)}" download>Download file</a>` : ""}
+      ${artifact.download_url ? `<a class="download-btn" href="${escapeHtml(artifact.download_url)}" download>Download ${escapeHtml((artifact.kind || "file").toUpperCase())}</a>` : `<div class="artifact-summary">No downloadable file was created for this output.</div>`}
     `;
     displayArea.prepend(card);
   }
@@ -72,7 +73,7 @@ function renderContextPackets(contextPackets) {
     card.innerHTML = `
       <div class="packet-head">
         <div>
-          <div class="packet-kind">Context Packet</div>
+          <div class="packet-kind">Source Packet</div>
           <div class="artifact-title">${escapeHtml(packet.agent || "agent")}</div>
         </div>
         <div class="confidence">${Math.round(Number(packet.confidence || 0) * 100)}%</div>
@@ -177,7 +178,8 @@ async function sendDirective() {
   appendMessage("user", directive);
   input.value = "";
   sendBtn.disabled = true;
-  renderSteps([{ label: "Thinking", detail: "Routing directive through local-first operator." }]);
+  const deepResearch = Boolean(deepResearchToggle && deepResearchToggle.checked);
+  renderSteps([{ label: "Thinking", detail: deepResearch ? "Deep research requested. Routing directive." : "Routing directive through automatic tier selection." }]);
   burstNetwork();
 
   try {
@@ -185,7 +187,7 @@ async function sendDirective() {
     const response = await fetch("/api/operator", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ directive })
+      body: JSON.stringify({ directive, deep_research: deepResearch })
     });
     const data = await response.json();
     const elapsed = Date.now() - started;

@@ -227,15 +227,22 @@ textarea:focus { border-color: var(--line-strong); }
   margin-top: 8px;
   gap: 10px;
 }
-.mode-pills { display: flex; gap: 5px; flex-wrap: wrap; }
-.pill {
+.deep-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   color: var(--muted);
   border: 1px solid var(--line);
   border-radius: 999px;
-  padding: 4px 8px;
+  padding: 5px 9px;
   font-size: 10px;
+  cursor: pointer;
+  user-select: none;
 }
-.pill.active {
+.deep-toggle input {
+  accent-color: var(--gold);
+}
+.deep-toggle:has(input:checked) {
   color: var(--gold);
   border-color: var(--line-strong);
   background: rgba(251,191,36,.06);
@@ -348,7 +355,7 @@ textarea:focus { border-color: var(--line-strong); }
   font-size: 10px;
   overflow-wrap: anywhere;
 }
-.artifact-card a {
+.artifact-card a, .download-btn {
   display: inline-flex;
   color: #111;
   background: var(--gold);
@@ -360,6 +367,14 @@ textarea:focus { border-color: var(--line-strong); }
 }
 .packet-card {
   border-color: rgba(34,211,238,.24);
+}
+.packet-card .artifact-title::after {
+  content: " gathered context, not a downloadable report";
+  display: block;
+  margin-top: 4px;
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 500;
 }
 .packet-head {
   display: flex;
