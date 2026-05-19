@@ -294,6 +294,56 @@ def test_capture_studio_saves_transcript_sidecar(tmp_path: Path):
     assert "reclaiming the prior candle high" in studio.latest_transcript()
 
 
+def test_capture_studio_loads_old_records_with_metadata_defaults(tmp_path: Path):
+    studio = CaptureStudio(tmp_path)
+    studio.capture_dir.mkdir(parents=True, exist_ok=True)
+    path = studio.capture_dir / "old-capture.webm"
+    path.write_bytes(b"fake-webm-data")
+    studio.index_path.write_text(
+        '{"id":"old-1","filename":"old-capture.webm","path":"'
+        + str(path).replace("\\", "\\\\")
+        + '","size_bytes":14,"created_at":"2026-05-19T00:00:00+00:00","transcript_status":"pending","analysis_status":"pending"}\n',
+        encoding="utf-8",
+    )
+
+    session = studio.all_captures()[0]
+
+    assert session.display_name == "old-capture"
+    assert session.generated_exports == []
+    assert session.ai_review_status == "not_started"
+
+
+def test_capture_studio_updates_and_deletes_capture_metadata(tmp_path: Path):
+    studio = CaptureStudio(tmp_path)
+    session = studio.save_capture(b"fake-webm-data", "review.webm", "Long after reclaim.")
+
+    updated = studio.update_capture(session.id, display_name="Morning NQ reclaim", tags=["NQ", "scalp!"])
+
+    assert updated.display_name == "Morning NQ reclaim"
+    assert updated.tags == ["NQ", "scalp"]
+    assert studio.get_capture(session.id).display_name == "Morning NQ reclaim"
+
+    deleted = studio.delete_capture(session.id)
+
+    assert deleted.id == session.id
+    assert studio.get_capture(session.id) is None
+    assert not Path(session.path).exists()
+    assert not Path(session.transcript_path).exists()
+
+
+def test_capture_studio_records_export_history(tmp_path: Path):
+    studio = CaptureStudio(tmp_path)
+    generator = PineStrategyGenerator(tmp_path)
+    session = studio.save_capture(b"fake-webm-data", "review.webm", "Long after reclaim.")
+    artifact = generator.generate_instruction_brief(studio.transcript_for(session.id), "Morning NQ")
+
+    updated = studio.record_export(session.id, "instructions", artifact)
+
+    assert updated.last_exported_at
+    assert updated.generated_exports[-1]["filename"] == artifact.filename
+    assert updated.generated_exports[-1]["type"] == "instructions"
+
+
 def test_pine_generator_creates_clean_strategy_file(tmp_path: Path):
     generator = PineStrategyGenerator(tmp_path)
 
@@ -367,6 +417,83 @@ def test_root_route_serves_studio():
     assert "AstraCore Trading Command Center" not in root_response.text
     assert "/static/app.js" not in root_response.text
     assert root_response.headers["cache-control"] == "no-store"
+
+
+def test_library_route_serves_capture_library():
+    client = TestClient(app)
+
+    response = client.get("/library")
+
+    assert response.status_code == 200
+    assert "AstraCore Capture Library" in response.text
+    assert "/static/library.js" in response.text
+
+
+def test_studio_recent_tray_links_to_library():
+    client = TestClient(app)
+
+    response = client.get("/studio")
+
+    assert response.status_code == 200
+    assert "View all captures" in response.text
+    assert 'href="/library"' in response.text
+
+
+def test_capture_api_limit_rename_delete_and_selected_export(tmp_path: Path, monkeypatch):
+    test_studio = CaptureStudio(tmp_path)
+    test_generator = PineStrategyGenerator(tmp_path)
+    monkeypatch.setattr("app.backend.capture_studio", test_studio)
+    monkeypatch.setattr("app.backend.pine_generator", test_generator)
+    client = TestClient(app)
+
+    first = test_studio.save_capture(b"fake-webm-data", "first.webm", "First transcript.")
+    second = test_studio.save_capture(b"fake-webm-data", "second.webm", "Second transcript reclaiming high.")
+    test_studio.save_capture(b"fake-webm-data", "third.webm", "Third transcript.")
+    test_studio.save_capture(b"fake-webm-data", "fourth.webm", "Fourth transcript.")
+    test_studio.save_capture(b"fake-webm-data", "fifth.webm", "Fifth transcript.")
+
+    limited = client.get("/api/captures?limit=4")
+    payload = limited.json()
+
+    assert limited.status_code == 200
+    assert len(payload["captures"]) == 4
+    assert payload["total"] == 5
+    assert payload["captures"][0]["id"] != first.id
+
+    renamed = client.patch(f"/api/captures/{second.id}", json={"display_name": "NQ reclaim review"})
+    assert renamed.status_code == 200
+    assert renamed.json()["capture"]["display_name"] == "NQ reclaim review"
+
+    exported = client.post(
+        f"/api/captures/{second.id}/export",
+        json={"name": "NQ reclaim review", "export_type": "instructions"},
+    )
+    export_payload = exported.json()
+
+    assert exported.status_code == 200
+    assert export_payload["strategy"]["source"] == "selected_capture_transcript"
+    assert export_payload["strategy"]["download_url"].endswith(".html")
+    assert export_payload["capture"]["generated_exports"][-1]["type"] == "instructions"
+
+    deleted = client.delete(f"/api/captures/{second.id}")
+
+    assert deleted.status_code == 200
+    assert test_studio.get_capture(second.id) is None
+
+
+def test_capture_export_fails_without_transcript(tmp_path: Path, monkeypatch):
+    test_studio = CaptureStudio(tmp_path)
+    monkeypatch.setattr("app.backend.capture_studio", test_studio)
+    client = TestClient(app)
+    session = test_studio.save_capture(b"fake-webm-data", "silent.webm")
+
+    response = client.post(
+        f"/api/captures/{session.id}/export",
+        json={"name": "Silent capture", "export_type": "pine"},
+    )
+
+    assert response.status_code == 400
+    assert "no transcript" in response.json()["detail"].lower()
 
 
 def test_old_dashboard_static_files_are_removed():

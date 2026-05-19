@@ -1,0 +1,256 @@
+const state = {
+  captures: [],
+  selected: null,
+  query: "",
+};
+
+const els = {
+  list: document.querySelector("#library-list"),
+  search: document.querySelector("#capture-search"),
+  refresh: document.querySelector("#refresh-captures-btn"),
+  empty: document.querySelector("#empty-detail"),
+  detail: document.querySelector("#capture-detail"),
+  video: document.querySelector("#detail-video"),
+  title: document.querySelector("#detail-title"),
+  meta: document.querySelector("#detail-meta"),
+  aiStatus: document.querySelector("#ai-status"),
+  setupType: document.querySelector("#setup-type"),
+  tradeGrade: document.querySelector("#trade-grade"),
+  displayName: document.querySelector("#display-name"),
+  saveName: document.querySelector("#save-name-btn"),
+  deleteCapture: document.querySelector("#delete-capture-btn"),
+  transcriptView: document.querySelector("#transcript-view"),
+  transcriptDownload: document.querySelector("#transcript-download"),
+  exportBtns: document.querySelectorAll(".library-export-btn"),
+  exportResult: document.querySelector("#library-export-result"),
+  generatedExports: document.querySelector("#generated-exports"),
+};
+
+async function loadCaptures() {
+  els.list.innerHTML = '<div class="result-box">Loading captures...</div>';
+  try {
+    const response = await fetch("/api/captures?limit=50&offset=0");
+    const data = await response.json();
+    state.captures = data.captures || [];
+    renderList();
+    if (!state.selected && state.captures.length) {
+      selectCapture(state.captures[0].id);
+    } else if (state.selected) {
+      const stillExists = state.captures.find((capture) => capture.id === state.selected.id);
+      if (stillExists) {
+        selectCapture(stillExists.id);
+      } else {
+        clearDetail();
+      }
+    }
+  } catch {
+    els.list.innerHTML = '<div class="result-box">Could not load captures.</div>';
+  }
+}
+
+function renderList() {
+  const filtered = state.captures.filter((capture) => {
+    const haystack = [
+      capture.display_name,
+      capture.filename,
+      capture.transcript_status,
+      capture.analysis_status,
+      ...(capture.tags || []),
+    ].join(" ").toLowerCase();
+    return haystack.includes(state.query.toLowerCase());
+  });
+  if (!filtered.length) {
+    els.list.innerHTML = '<div class="result-box">No captures match this search.</div>';
+    return;
+  }
+  els.list.innerHTML = filtered.map((capture) => `
+    <button class="library-row ${state.selected?.id === capture.id ? "active" : ""}" type="button" data-capture-id="${capture.id}">
+      <span class="capture-thumb"></span>
+      <span>
+        <span class="capture-name">${escapeHtml(capture.display_name || capture.filename)}</span>
+        <span class="capture-meta">${formatBytes(capture.size_bytes)} · ${new Date(capture.created_at).toLocaleString()}</span>
+      </span>
+    </button>
+  `).join("");
+  els.list.querySelectorAll("[data-capture-id]").forEach((button) => {
+    button.addEventListener("click", () => selectCapture(button.dataset.captureId));
+  });
+}
+
+async function selectCapture(captureId) {
+  const capture = state.captures.find((item) => item.id === captureId);
+  if (!capture) {
+    clearDetail();
+    return;
+  }
+  state.selected = capture;
+  els.empty.classList.add("hidden");
+  els.detail.classList.remove("hidden");
+  els.video.src = capture.download_url;
+  els.title.textContent = capture.display_name || capture.filename;
+  els.meta.textContent = `${capture.filename} · ${formatBytes(capture.size_bytes)} · ${new Date(capture.created_at).toLocaleString()}`;
+  els.aiStatus.textContent = capture.ai_review_status || "not_started";
+  els.setupType.textContent = capture.setup_type || "unset";
+  els.tradeGrade.textContent = capture.trade_grade || "unset";
+  els.displayName.value = capture.display_name || capture.filename;
+  renderTranscript(capture);
+  renderGeneratedExports(capture);
+  els.exportResult.textContent = "Select an export to regenerate it from this capture transcript.";
+  renderList();
+}
+
+function clearDetail() {
+  state.selected = null;
+  els.empty.classList.remove("hidden");
+  els.detail.classList.add("hidden");
+  els.video.removeAttribute("src");
+  els.video.load();
+  renderList();
+}
+
+async function renderTranscript(capture) {
+  if (!capture.transcript_download_url) {
+    els.transcriptDownload.classList.add("hidden");
+    els.transcriptView.textContent = "No transcript saved for this capture.";
+    return;
+  }
+  els.transcriptDownload.classList.remove("hidden");
+  els.transcriptDownload.href = capture.transcript_download_url;
+  try {
+    const response = await fetch(capture.transcript_download_url);
+    els.transcriptView.textContent = await response.text();
+  } catch {
+    els.transcriptView.textContent = "Could not load transcript.";
+  }
+}
+
+function renderGeneratedExports(capture) {
+  const exports = capture.generated_exports || [];
+  if (!exports.length) {
+    els.generatedExports.innerHTML = "";
+    return;
+  }
+  els.generatedExports.innerHTML = exports.slice().reverse().map((item) => `
+    <div class="export-history-row">
+      <span>${escapeHtml(item.type || "export")} · ${escapeHtml(item.filename || "output")}</span>
+      <span>${item.created_at ? new Date(item.created_at).toLocaleString() : ""}</span>
+    </div>
+  `).join("");
+}
+
+async function saveName() {
+  if (!state.selected) {
+    return;
+  }
+  els.saveName.disabled = true;
+  try {
+    const response = await fetch(`/api/captures/${state.selected.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ display_name: els.displayName.value.trim() }),
+    });
+    if (!response.ok) {
+      throw new Error("Rename failed.");
+    }
+    const data = await response.json();
+    state.captures = state.captures.map((capture) => capture.id === data.capture.id ? data.capture : capture);
+    selectCapture(data.capture.id);
+  } catch (error) {
+    els.exportResult.textContent = error.message || "Could not rename capture.";
+  } finally {
+    els.saveName.disabled = false;
+  }
+}
+
+async function deleteCapture() {
+  if (!state.selected) {
+    return;
+  }
+  const name = state.selected.display_name || state.selected.filename;
+  if (!window.confirm(`Delete "${name}" permanently? This removes the video and transcript.`)) {
+    return;
+  }
+  try {
+    const response = await fetch(`/api/captures/${state.selected.id}`, { method: "DELETE" });
+    if (!response.ok) {
+      throw new Error("Delete failed.");
+    }
+    state.captures = state.captures.filter((capture) => capture.id !== state.selected.id);
+    clearDetail();
+    if (state.captures.length) {
+      selectCapture(state.captures[0].id);
+    }
+  } catch (error) {
+    els.exportResult.textContent = error.message || "Could not delete capture.";
+  }
+}
+
+async function exportSelected(exportType) {
+  if (!state.selected) {
+    return;
+  }
+  els.exportBtns.forEach((button) => {
+    button.disabled = true;
+  });
+  els.exportResult.textContent = "Building export from selected capture transcript...";
+  try {
+    const response = await fetch(`/api/captures/${state.selected.id}/export`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: els.displayName.value.trim() || "AstraCore Scalp Assist",
+        export_type: exportType,
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.detail || "Export failed.");
+    }
+    state.captures = state.captures.map((capture) => capture.id === data.capture.id ? data.capture : capture);
+    state.selected = data.capture;
+    els.exportResult.innerHTML = `
+      <strong>${escapeHtml(data.strategy.title)}</strong><br>
+      ${escapeHtml(data.strategy.summary)}<br>
+      <a href="${data.strategy.download_url}" download>Download ${escapeHtml(data.strategy.filename)}</a>
+    `;
+    renderGeneratedExports(data.capture);
+    renderList();
+  } catch (error) {
+    els.exportResult.textContent = error.message || "Could not generate export.";
+  } finally {
+    els.exportBtns.forEach((button) => {
+      button.disabled = false;
+    });
+  }
+}
+
+function formatBytes(bytes) {
+  if (!bytes) {
+    return "0 B";
+  }
+  const units = ["B", "KB", "MB", "GB"];
+  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  return `${(bytes / 1024 ** index).toFixed(index ? 1 : 0)} ${units[index]}`;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+els.search.addEventListener("input", () => {
+  state.query = els.search.value;
+  renderList();
+});
+els.refresh.addEventListener("click", loadCaptures);
+els.saveName.addEventListener("click", saveName);
+els.deleteCapture.addEventListener("click", deleteCapture);
+els.exportBtns.forEach((button) => {
+  button.addEventListener("click", () => exportSelected(button.dataset.exportType || "pine"));
+});
+
+loadCaptures();

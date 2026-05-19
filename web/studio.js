@@ -429,14 +429,14 @@ function toggleMic() {
 async function loadCaptures() {
   els.capturesList.innerHTML = '<div class="result-box">Loading captures...</div>';
   try {
-    const response = await fetch("/api/captures?limit=20");
+    const response = await fetch("/api/captures?limit=4");
     const data = await response.json();
     const captures = data.captures || [];
     if (!captures.length) {
       els.capturesList.innerHTML = '<div class="result-box">No captures saved yet.</div>';
       return;
     }
-    els.capturesList.innerHTML = captures.reverse().map((capture) => {
+    els.capturesList.innerHTML = captures.map((capture) => {
       const transcriptLink = capture.transcript_download_url
         ? `<a class="transcript-link" href="${capture.transcript_download_url}" download>Transcript</a>`
         : "";
@@ -445,7 +445,7 @@ async function loadCaptures() {
       <a class="capture-item" href="${capture.download_url}" download>
         <span class="capture-thumb"></span>
         <span>
-          <span class="capture-name">${escapeHtml(capture.filename)}</span>
+          <span class="capture-name">${escapeHtml(capture.display_name || capture.filename)}</span>
           <span class="capture-meta">${formatBytes(capture.size_bytes)} · ${new Date(capture.created_at).toLocaleString()}</span>
         </span>
       </a>

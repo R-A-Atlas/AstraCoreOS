@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AstraCore Capture Library</title>
+  <link rel="stylesheet" href="/static/studio.css" />
+  <link rel="stylesheet" href="/static/library.css" />
+</head>
+<body>
+  <main class="library-shell">
+    <header class="studio-topbar">
+      <a class="brand" href="/" aria-label="Back to studio">
+        <span class="brand-mark"></span>
+        <span>AstraCore</span>
+        <span class="brand-muted">Capture Library</span>
+      </a>
+
+      <nav class="top-actions" aria-label="Library controls">
+        <a class="toolbar-btn library-top-link" href="/">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+          Studio
+        </a>
+      </nav>
+    </header>
+
+    <section class="library-grid">
+      <aside class="library-list-panel" aria-label="All captures">
+        <div class="library-panel-head">
+          <div>
+            <p>Archive</p>
+            <h1>All captures</h1>
+          </div>
+          <button id="refresh-captures-btn" class="icon-btn" type="button" aria-label="Refresh captures">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 0 1-15.5 6.2M3 12A9 9 0 0 1 18.5 5.8M18 2v4h-4M6 22v-4h4"/></svg>
+          </button>
+        </div>
+
+        <label for="capture-search">Search captures</label>
+        <input id="capture-search" type="search" placeholder="Search name, file, transcript status..." />
+
+        <div id="library-list" class="library-list"></div>
+      </aside>
+
+      <section class="library-detail-panel" aria-label="Selected capture detail">
+        <div id="empty-detail" class="library-empty">
+          <div class="empty-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg>
+          </div>
+          <h2>Select a capture.</h2>
+          <p>Review the video, inspect the transcript, regenerate exports, or manage metadata.</p>
+        </div>
+
+        <div id="capture-detail" class="capture-detail hidden">
+          <div class="detail-hero">
+            <video id="detail-video" controls playsinline></video>
+            <div class="detail-meta-card">
+              <p>AI Memory</p>
+              <h2 id="detail-title">Capture</h2>
+              <span id="detail-meta"></span>
+              <div class="memory-grid">
+                <div><strong id="ai-status">not_started</strong><span>AI review</span></div>
+                <div><strong id="setup-type">unset</strong><span>Setup type</span></div>
+                <div><strong id="trade-grade">unset</strong><span>Trade grade</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="library-actions">
+            <label for="display-name">Display name</label>
+            <div class="rename-row">
+              <input id="display-name" type="text" />
+              <button id="save-name-btn" class="secondary-btn" type="button">Save name</button>
+            </div>
+            <button id="delete-capture-btn" class="danger-btn" type="button">Delete capture</button>
+          </div>
+
+          <section class="detail-split">
+            <article class="library-card">
+              <div class="section-title-row">
+                <div>
+                  <p>Transcript</p>
+                  <h3>Source narration</h3>
+                </div>
+                <a id="transcript-download" class="small-link" href="#" download>Download</a>
+              </div>
+              <pre id="transcript-view" class="transcript-view">No transcript saved for this capture.</pre>
+            </article>
+
+            <article class="library-card">
+              <div class="section-title-row">
+                <div>
+                  <p>Regenerate</p>
+                  <h3>Exports from this capture</h3>
+                </div>
+              </div>
+              <div class="export-grid">
+                <button class="primary-btn wide library-export-btn" type="button" data-export-type="pine">Pine Script</button>
+                <button class="secondary-btn wide library-export-btn" type="button" data-export-type="mt5">MT5 / MQL5</button>
+                <button class="secondary-btn wide library-export-btn" type="button" data-export-type="instructions">Visual Playbook</button>
+              </div>
+              <div id="library-export-result" class="result-box">Select an export to regenerate it from this capture transcript.</div>
+              <div id="generated-exports" class="generated-exports"></div>
+            </article>
+          </section>
+
+          <article class="library-card ai-placeholder">
+            <div>
+              <p>Next layer</p>
+              <h3>AI trade review</h3>
+            </div>
+            <span>Coming next: video-frame review, timestamped critiques, setup tagging, and trader behavior memory.</span>
+            <button class="secondary-btn" type="button" disabled>AI Review not wired yet</button>
+          </article>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="/static/library.js"></script>
+</body>
+</html>

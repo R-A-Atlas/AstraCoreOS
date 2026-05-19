@@ -54,6 +54,17 @@ class PineStrategyRequest(BaseModel):
     export_type: str = Field("pine", max_length=20)
 
 
+class CaptureUpdateRequest(BaseModel):
+    display_name: str | None = Field(None, max_length=120)
+    tags: list[str] | None = None
+    notes_summary: str | None = Field(None, max_length=500)
+
+
+class CaptureExportRequest(BaseModel):
+    name: str = Field("AstraCore Scalp Assist", max_length=100)
+    export_type: str = Field("pine", max_length=20)
+
+
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(
@@ -67,6 +78,15 @@ def index() -> FileResponse:
 def studio() -> FileResponse:
     return FileResponse(
         WEB / "studio.html",
+        media_type="text/html; charset=utf-8",
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@app.get("/library")
+def capture_library() -> FileResponse:
+    return FileResponse(
+        WEB / "library.html",
         media_type="text/html; charset=utf-8",
         headers={"Cache-Control": "no-store"},
     )
@@ -187,21 +207,86 @@ async def save_capture(request: Request, filename: str = "", transcript: str = "
     }
 
 
+def _capture_payload(session) -> dict:
+    return {
+        **session.to_dict(),
+        "download_url": f"/captures/{session.filename}",
+        "transcript_download_url": (
+            f"/captures/{session.transcript_filename}" if session.transcript_filename else ""
+        ),
+    }
+
+
+def _build_strategy_artifact(notes: str, name: str, export_type: str):
+    clean_export_type = export_type.strip().lower()
+    if clean_export_type == "pine":
+        return pine_generator.generate_scalp_assist(notes, name), "pine"
+    if clean_export_type in {"mt5", "mql5"}:
+        return pine_generator.generate_mql5_expert(notes, name), "mt5"
+    if clean_export_type in {"instructions", "brief", "markdown"}:
+        return pine_generator.generate_instruction_brief(notes, name), "instructions"
+    raise HTTPException(status_code=400, detail="Unsupported export type.")
+
+
 @app.get("/api/captures")
-def list_captures(limit: int = 20) -> dict:
+def list_captures(limit: int = 20, offset: int = 0) -> dict:
     safe_limit = min(max(limit, 1), 50)
+    safe_offset = max(offset, 0)
+    captures = capture_studio.paged_captures(safe_limit, safe_offset)
     return {
         "ok": True,
-        "captures": [
-            {
-                **session.to_dict(),
-                "download_url": f"/captures/{session.filename}",
-                "transcript_download_url": (
-                    f"/captures/{session.transcript_filename}" if session.transcript_filename else ""
-                ),
-            }
-            for session in capture_studio.recent_captures(safe_limit)
-        ],
+        "captures": [_capture_payload(session) for session in captures],
+        "total": len(capture_studio.all_captures()),
+        "limit": safe_limit,
+        "offset": safe_offset,
+    }
+
+
+@app.patch("/api/captures/{capture_id}")
+def update_capture(capture_id: str, req: CaptureUpdateRequest) -> dict:
+    try:
+        session = capture_studio.update_capture(
+            capture_id,
+            display_name=req.display_name,
+            tags=req.tags,
+            notes_summary=req.notes_summary,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"ok": True, "capture": _capture_payload(session)}
+
+
+@app.delete("/api/captures/{capture_id}")
+def delete_capture(capture_id: str) -> dict:
+    try:
+        session = capture_studio.delete_capture(capture_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"ok": True, "deleted": session.id}
+
+
+@app.post("/api/captures/{capture_id}/export")
+def export_capture(capture_id: str, req: CaptureExportRequest) -> dict:
+    try:
+        notes = capture_studio.transcript_for(capture_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if not notes:
+        raise HTTPException(status_code=400, detail="Selected capture has no transcript to export.")
+    artifact, export_type = _build_strategy_artifact(notes, req.name, req.export_type)
+    try:
+        session = capture_studio.record_export(capture_id, export_type, artifact)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {
+        "ok": True,
+        "capture": _capture_payload(session),
+        "strategy": {
+            **artifact.to_dict(),
+            "download_url": f"/outputs/{artifact.filename}",
+            "source": "selected_capture_transcript",
+            "export_type": export_type,
+        },
     }
 
 
@@ -231,15 +316,7 @@ def generate_strategy_export(req: PineStrategyRequest) -> dict:
             status_code=400,
             detail="No strategy input found. Record a session with transcript or type notes.",
         )
-    export_type = req.export_type.strip().lower()
-    if export_type == "pine":
-        artifact = pine_generator.generate_scalp_assist(notes, req.name)
-    elif export_type in {"mt5", "mql5"}:
-        artifact = pine_generator.generate_mql5_expert(notes, req.name)
-    elif export_type in {"instructions", "brief", "markdown"}:
-        artifact = pine_generator.generate_instruction_brief(notes, req.name)
-    else:
-        raise HTTPException(status_code=400, detail="Unsupported export type.")
+    artifact, export_type = _build_strategy_artifact(notes, req.name, req.export_type)
     return {
         "ok": True,
         "strategy": {
