@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from datetime import date
+from pathlib import Path
 
+from app.config import env_bool
 from app.notifications import notification_channels
 from app.skills_registry import trading_intel_skills
+from app.tradingview import TradingViewBridge
 
 
 @dataclass(frozen=True)
@@ -18,13 +21,18 @@ class CommandCenterState:
     agent_tasks: list[dict]
     intel_tasks: list[dict]
     notification_channels: list[dict]
+    integrations: list[dict]
+    tradingview_alerts: list[dict]
     workflow_notes: list[str]
 
     def to_dict(self) -> dict:
         return asdict(self)
 
 
-def default_command_center_state() -> CommandCenterState:
+def default_command_center_state(root: Path | None = None) -> CommandCenterState:
+    tradingview_alerts = []
+    if root:
+        tradingview_alerts = [alert.to_dict() for alert in TradingViewBridge(root).recent_alerts(5)]
     return CommandCenterState(
         session_date=date.today().isoformat(),
         title="AstraCore Trading Command Center",
@@ -68,6 +76,16 @@ def default_command_center_state() -> CommandCenterState:
             for skill in trading_intel_skills()
         ],
         notification_channels=[channel.to_dict() for channel in notification_channels()],
+        integrations=[
+            {
+                "id": "tradingview",
+                "title": "TradingView Alerts",
+                "status": "enabled" if env_bool("TRADINGVIEW_WEBHOOK_ENABLED", True) else "disabled",
+                "local_url": "/api/integrations/tradingview/webhook",
+                "purpose": "Receive TradingView alert webhooks and feed them into command-center context.",
+            }
+        ],
+        tradingview_alerts=tradingview_alerts,
         workflow_notes=[
             "Codex owns code changes, tests, commits, and local verification.",
             "Claude Code can be used as a separate worker for specs, critique, and alternate implementation notes.",

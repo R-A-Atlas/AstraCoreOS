@@ -59,9 +59,36 @@ MVP slice 1:
 - local document writer
 - one-page business plan generation
 - web UI shell
+- trading command center shell
+- TradingView alert webhook receiver
 - tests
 
 Paid model usage:
 
 - disabled by default
 - planned behind explicit confirmation
+
+## TradingView alerts
+
+AstraCore can receive TradingView alert webhooks and show the latest alerts in the command center.
+
+Local endpoint:
+
+```text
+http://127.0.0.1:8010/api/integrations/tradingview/webhook
+```
+
+Example alert body:
+
+```json
+{
+  "secret": "same-value-as-TRADINGVIEW_WEBHOOK_SECRET",
+  "symbol": "{{ticker}}",
+  "timeframe": "{{interval}}",
+  "price": "{{close}}",
+  "action": "alert",
+  "message": "{{strategy.order.alert_message}}"
+}
+```
+
+For real TradingView cloud alerts, `127.0.0.1` is not reachable from TradingView. Use a deployed URL or a temporary tunnel later, then set `TRADINGVIEW_WEBHOOK_PUBLIC_URL` in `.env`.

@@ -6,6 +6,7 @@ from app.intel_runner import IntelRunner
 from app.notifications import notification_channels
 from app.operator_agent import OperatorAgent
 from app.skills_registry import skill_catalog
+from app.tradingview import TradingViewBridge
 
 
 def test_mobile_detailing_docx_created(tmp_path: Path):
@@ -170,6 +171,8 @@ def test_default_command_center_state_is_trading_focused():
     assert state["agent_tasks"][1]["owner"] == "Claude Code"
     assert any(task["skill_id"] == "daily_market_prep" for task in state["intel_tasks"])
     assert any(channel["id"] == "telegram" for channel in state["notification_channels"])
+    assert state["integrations"][0]["id"] == "tradingview"
+    assert state["tradingview_alerts"] == []
 
 
 def test_skill_catalog_registers_trading_intel_prompts():
@@ -218,3 +221,39 @@ def test_intel_runner_rejects_unknown_skill():
     assert result.ok is False
     assert result.packet == {}
     assert "Unknown intel skill" in result.message
+
+
+def test_tradingview_bridge_ingests_alert_without_exposing_secret(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("TRADINGVIEW_WEBHOOK_SECRET", "tv-secret")
+    bridge = TradingViewBridge(tmp_path)
+
+    alert = bridge.ingest(
+        {
+            "secret": "tv-secret",
+            "symbol": "NQ1!",
+            "timeframe": "5",
+            "price": "21850.25",
+            "action": "long_watch",
+            "message": "NQ reclaim alert",
+        }
+    )
+    recent = bridge.recent_alerts()
+    status = bridge.status()
+
+    assert alert.symbol == "NQ1!"
+    assert recent[-1].action == "long_watch"
+    assert status["secret_configured"] is True
+    assert "tv-secret" not in str(alert.to_dict())
+    assert "tv-secret" not in str(status)
+
+
+def test_tradingview_bridge_rejects_bad_secret(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("TRADINGVIEW_WEBHOOK_SECRET", "tv-secret")
+    bridge = TradingViewBridge(tmp_path)
+
+    try:
+        bridge.ingest({"secret": "wrong", "symbol": "NQ1!"})
+    except PermissionError as exc:
+        assert "Invalid TradingView" in str(exc)
+    else:
+        raise AssertionError("Expected bad TradingView secret to be rejected.")

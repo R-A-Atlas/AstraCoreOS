@@ -13,6 +13,7 @@ from app.intel_runner import IntelRunner
 from app.notifications import notification_channels
 from app.operator_agent import OperatorAgent
 from app.skills_registry import skill_catalog
+from app.tradingview import TradingViewBridge
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,6 +24,7 @@ app = FastAPI(title="AstraCore OS", version="0.1.0")
 config = AppConfig(ROOT)
 agent = OperatorAgent(ROOT)
 intel_runner = IntelRunner()
+tradingview_bridge = TradingViewBridge(ROOT)
 
 app.mount("/static", StaticFiles(directory=WEB), name="static")
 app.mount("/outputs", StaticFiles(directory=OUTPUTS), name="outputs")
@@ -67,7 +69,7 @@ def config_status() -> dict:
 def command_center() -> dict:
     return {
         "ok": True,
-        "state": default_command_center_state().to_dict(),
+        "state": default_command_center_state(ROOT).to_dict(),
     }
 
 
@@ -85,6 +87,27 @@ def intel_status() -> dict:
         "ok": True,
         **skill_catalog(),
         "notifications": [channel.to_dict() for channel in notification_channels()],
+    }
+
+
+@app.get("/api/integrations/tradingview/status")
+def tradingview_status() -> dict:
+    return {
+        "ok": True,
+        "status": tradingview_bridge.status(),
+        "example_alert_body": TradingViewBridge.example_alert_body(),
+    }
+
+
+@app.post("/api/integrations/tradingview/webhook")
+def tradingview_webhook(payload: dict) -> dict:
+    try:
+        alert = tradingview_bridge.ingest(payload)
+    except PermissionError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    return {
+        "ok": True,
+        "alert": alert.to_dict(),
     }
 
 

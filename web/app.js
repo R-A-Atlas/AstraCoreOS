@@ -130,6 +130,8 @@ function renderCommandCenter(state) {
   const tasks = state.agent_tasks || [];
   const intelTasks = state.intel_tasks || [];
   const notificationChannels = state.notification_channels || [];
+  const integrations = state.integrations || [];
+  const tradingViewAlerts = state.tradingview_alerts || [];
   const notes = state.workflow_notes || [];
   card.innerHTML = `
     <div class="packet-kind">Command Center</div>
@@ -180,6 +182,24 @@ function renderCommandCenter(state) {
             ${escapeHtml(channel.title)}
           </p>
         `).join("") || "<p>No update channels configured.</p>"}
+      </section>
+      <section>
+        <b>Integrations</b>
+        ${integrations.map(item => `
+          <p>
+            <span class="skill-status ${escapeHtml(item.status)}">${escapeHtml(item.status)}</span>
+            ${escapeHtml(item.title)} · ${escapeHtml(item.local_url)}
+          </p>
+        `).join("") || "<p>No integrations registered.</p>"}
+      </section>
+      <section>
+        <b>TradingView Alerts</b>
+        ${tradingViewAlerts.map(alert => `
+          <p>
+            <span class="skill-status ready">${escapeHtml(alert.action || "alert")}</span>
+            ${escapeHtml(alert.symbol || "UNKNOWN")} · ${escapeHtml(alert.timeframe || "")} · ${escapeHtml(alert.price || "")}
+          </p>
+        `).join("") || "<p>No TradingView alerts received yet.</p>"}
       </section>
       <section>
         <b>Workflow Rules</b>

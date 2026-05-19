@@ -4,3 +4,4 @@ __pycache__/
 .env
 workspace/outputs/*.docx
 workspace/memory/*.jsonl
+workspace/integrations/*.jsonl
