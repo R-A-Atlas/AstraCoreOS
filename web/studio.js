@@ -49,6 +49,7 @@ const els = {
   strategyName: document.querySelector("#strategy-name"),
   strategyNotes: document.querySelector("#strategy-notes"),
   generatePineBtn: document.querySelector("#generate-pine-btn"),
+  exportBtns: document.querySelectorAll(".export-btn, #generate-pine-btn"),
   pineResult: document.querySelector("#pine-result"),
 };
 
@@ -248,10 +249,7 @@ async function saveRecording() {
     const transcriptLink = data.capture.transcript_download_url
       ? `<br><a href="${data.capture.transcript_download_url}" download>Download transcript</a>`
       : "";
-    els.pineResult.innerHTML = `Capture saved: <a href="${data.capture.download_url}" download>${data.capture.filename}</a>${transcriptLink}`;
-    if (transcript && !els.strategyNotes.value.trim()) {
-      els.strategyNotes.value = transcript;
-    }
+    els.pineResult.innerHTML = `Capture saved: <a href="${data.capture.download_url}" download>${data.capture.filename}</a>${transcriptLink}<br>Choose Pine Script, MT5/MQL5, or Trade Instructions. The latest transcript will be used automatically.`;
     await loadCaptures();
     openTray();
   } catch (error) {
@@ -468,34 +466,37 @@ function closeTray() {
   els.tray.classList.remove("open");
 }
 
-async function generatePine() {
+async function generateStrategyExport(exportType = "pine") {
   const name = els.strategyName.value.trim() || "AstraCore Scalp Assist";
   const notes = els.strategyNotes.value.trim();
-  if (!notes) {
-    els.pineResult.textContent = "Add the trade rules first. Plain English is fine. Video/audio extraction is not wired yet.";
-    return;
-  }
-  els.generatePineBtn.disabled = true;
-  els.pineResult.textContent = "Building Pine v6 script from your notes...";
+  els.exportBtns.forEach((button) => {
+    button.disabled = true;
+  });
+  const label = exportType === "mt5" ? "MT5/MQL5 Expert Advisor" : exportType === "instructions" ? "trade instructions" : "Pine Script";
+  els.pineResult.textContent = `Building ${label} from ${notes ? "typed notes" : "latest capture transcript"}...`;
   try {
-    const response = await fetch("/api/strategies/pine", {
+    const response = await fetch("/api/strategies/export", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, notes }),
+      body: JSON.stringify({ name, notes, export_type: exportType }),
     });
     if (!response.ok) {
-      throw new Error(`Generation failed with ${response.status}`);
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.detail || `Generation failed with ${response.status}`);
     }
     const data = await response.json();
     els.pineResult.innerHTML = `
       <strong>${escapeHtml(data.strategy.title)}</strong><br>
       ${escapeHtml(data.strategy.summary)}<br>
+      Source: ${escapeHtml(data.strategy.source)}<br>
       <a href="${data.strategy.download_url}" download>Download ${escapeHtml(data.strategy.filename)}</a>
     `;
   } catch (error) {
-    els.pineResult.textContent = error.message || "Could not generate Pine.";
+    els.pineResult.textContent = error.message || "Could not generate export.";
   } finally {
-    els.generatePineBtn.disabled = false;
+    els.exportBtns.forEach((button) => {
+      button.disabled = false;
+    });
   }
 }
 
@@ -543,7 +544,9 @@ function wireEvents() {
   els.micBtn.addEventListener("click", toggleMic);
   els.openTrayBtn.addEventListener("click", openTray);
   els.closeTrayBtn.addEventListener("click", closeTray);
-  els.generatePineBtn.addEventListener("click", generatePine);
+  els.exportBtns.forEach((button) => {
+    button.addEventListener("click", () => generateStrategyExport(button.dataset.exportType || "pine"));
+  });
   els.openStrategyBtn.addEventListener("click", () => els.strategyDrawer.classList.add("open"));
   els.collapseStrategyBtn.addEventListener("click", () => els.strategyDrawer.classList.remove("open"));
   window.addEventListener("keydown", (event) => {

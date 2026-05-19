@@ -291,6 +291,7 @@ def test_capture_studio_saves_transcript_sidecar(tmp_path: Path):
     assert session.transcript_filename.endswith(".txt")
     assert transcript_path.exists()
     assert "reclaiming the prior candle high" in transcript_path.read_text(encoding="utf-8")
+    assert "reclaiming the prior candle high" in studio.latest_transcript()
 
 
 def test_pine_generator_creates_clean_strategy_file(tmp_path: Path):
@@ -309,6 +310,38 @@ def test_pine_generator_creates_clean_strategy_file(tmp_path: Path):
     assert "strategy.entry" in content
     assert "alert(" in content
     assert "plotshape" in content
+
+
+def test_strategy_generator_creates_mt5_and_instruction_exports(tmp_path: Path):
+    generator = PineStrategyGenerator(tmp_path)
+    notes = "NQ scalp long after reclaiming prior candle high. Stop under trigger candle."
+
+    mt5 = generator.generate_mql5_expert(notes, "My NQ Scalp")
+    instructions = generator.generate_instruction_brief(notes, "My NQ Scalp")
+    mt5_content = Path(mt5.path).read_text(encoding="utf-8")
+    instructions_content = Path(instructions.path).read_text(encoding="utf-8")
+
+    assert mt5.filename.endswith(".mq5")
+    assert "#include <Trade/Trade.mqh>" in mt5_content
+    assert "Trade.Buy" in mt5_content
+    assert instructions.filename.endswith(".md")
+    assert "Execution Checklist" in instructions_content
+    assert "reclaiming prior candle high" in instructions_content
+
+
+def test_strategy_export_uses_latest_capture_transcript_when_notes_empty(tmp_path: Path):
+    studio = CaptureStudio(tmp_path)
+    generator = PineStrategyGenerator(tmp_path)
+    studio.save_capture(
+        b"fake-webm-data",
+        "capture.webm",
+        "Long only after reclaiming prior candle high with trend behind me.",
+    )
+
+    artifact = generator.generate_instruction_brief(studio.latest_transcript(), "Transcript Strategy")
+    content = Path(artifact.path).read_text(encoding="utf-8")
+
+    assert "Long only after reclaiming prior candle high" in content
 
 
 def test_studio_route_serves_focused_capture_ui():

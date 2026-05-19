@@ -77,6 +77,17 @@ class CaptureStudio:
                     continue
         return sessions[-limit:]
 
+    def latest_transcript(self) -> str:
+        for session in reversed(self.recent_captures(50)):
+            if not session.transcript_path:
+                continue
+            path = Path(session.transcript_path)
+            if path.exists() and path.is_file():
+                text = path.read_text(encoding="utf-8").strip()
+                if text:
+                    return text
+        return ""
+
     @staticmethod
     def _safe_filename(filename: str | None) -> str:
         base = (filename or "").strip()

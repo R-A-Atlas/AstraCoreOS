@@ -300,6 +300,26 @@ svg {
   box-shadow: 0 1rem 2rem -1rem rgba(255, 79, 88, 0.8);
 }
 
+.secondary-btn {
+  min-height: 2.75rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 1.1rem;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text);
+  font-weight: 750;
+}
+
+.secondary-btn:hover {
+  background: rgba(255, 255, 255, 0.075);
+  border-color: var(--line-strong);
+}
+
+.secondary-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .primary-btn:hover {
   filter: brightness(1.06);
 }
@@ -319,6 +339,11 @@ svg {
 
 .wide {
   width: 100%;
+}
+
+.export-grid {
+  display: grid;
+  gap: 0.55rem;
 }
 
 .preview-hud,

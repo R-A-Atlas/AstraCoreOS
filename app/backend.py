@@ -51,6 +51,7 @@ class IntelRunRequest(BaseModel):
 class PineStrategyRequest(BaseModel):
     name: str = Field("AstraCore Scalp Assist", max_length=100)
     notes: str = Field("", max_length=12000)
+    export_type: str = Field("pine", max_length=20)
 
 
 @app.get("/")
@@ -206,11 +207,45 @@ def list_captures(limit: int = 20) -> dict:
 
 @app.post("/api/strategies/pine")
 def generate_pine_strategy(req: PineStrategyRequest) -> dict:
-    artifact = pine_generator.generate_scalp_assist(req.notes, req.name)
+    notes = req.notes.strip() or capture_studio.latest_transcript()
+    if not notes:
+        raise HTTPException(
+            status_code=400,
+            detail="No strategy input found. Record a session with transcript or type notes.",
+        )
+    artifact = pine_generator.generate_scalp_assist(notes, req.name)
     return {
         "ok": True,
         "strategy": {
             **artifact.to_dict(),
             "download_url": f"/outputs/{artifact.filename}",
+        },
+    }
+
+
+@app.post("/api/strategies/export")
+def generate_strategy_export(req: PineStrategyRequest) -> dict:
+    notes = req.notes.strip() or capture_studio.latest_transcript()
+    if not notes:
+        raise HTTPException(
+            status_code=400,
+            detail="No strategy input found. Record a session with transcript or type notes.",
+        )
+    export_type = req.export_type.strip().lower()
+    if export_type == "pine":
+        artifact = pine_generator.generate_scalp_assist(notes, req.name)
+    elif export_type in {"mt5", "mql5"}:
+        artifact = pine_generator.generate_mql5_expert(notes, req.name)
+    elif export_type in {"instructions", "brief", "markdown"}:
+        artifact = pine_generator.generate_instruction_brief(notes, req.name)
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported export type.")
+    return {
+        "ok": True,
+        "strategy": {
+            **artifact.to_dict(),
+            "download_url": f"/outputs/{artifact.filename}",
+            "source": "typed_notes" if req.notes.strip() else "latest_capture_transcript",
+            "export_type": export_type,
         },
     }

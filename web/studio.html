@@ -77,10 +77,14 @@
         <input id="strategy-name" type="text" value="AstraCore Scalp Assist" />
 
         <label for="strategy-notes">Plain-English rules</label>
-        <textarea id="strategy-notes" rows="9" placeholder="Example: NQ scalp. Long when price reclaims prior candle high with trend behind me. Stop under the reclaim candle. Target nearest liquidity or 1.5 ATR. Shorts are inverse."></textarea>
+        <textarea id="strategy-notes" rows="9" placeholder="Optional. Leave blank and AstraCore will use the latest capture transcript."></textarea>
 
-        <button id="generate-pine-btn" class="primary-btn wide" type="button">Build Pine from notes</button>
-        <div id="pine-result" class="result-box">Recordings are saved. Video/audio strategy extraction is the next backend step; this button currently builds Pine from the notes you type here.</div>
+        <div class="export-grid" aria-label="Strategy export options">
+          <button id="generate-pine-btn" class="primary-btn wide" type="button" data-export-type="pine">Pine Script</button>
+          <button class="secondary-btn wide export-btn" type="button" data-export-type="mt5">MT5 / MQL5</button>
+          <button class="secondary-btn wide export-btn" type="button" data-export-type="instructions">Trade Instructions</button>
+        </div>
+        <div id="pine-result" class="result-box">Record a session, explain the setup, then choose one export. If this box is blank, AstraCore uses the latest saved transcript automatically.</div>
       </aside>
 
       <button id="open-strategy-btn" class="floating-strategy-btn hidden" type="button">Strategy</button>
