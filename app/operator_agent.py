@@ -48,14 +48,11 @@ class OperatorAgent:
 
         if self._asks_capabilities(text):
             return self._simple(
-                "Right now I can chat locally and use the Business Documentation Agent to create practical plans, reports, SOPs, and proposals as real Word documents.",
+                "Right now I can chat, use Gemini for general replies when enabled, and use the Business Documentation Agent to create practical plans, reports, SOPs, and proposals as real Word documents. Live web, Google Maps, email, and market-data tools are not wired yet.",
                 "chat",
             )
 
-        return self._simple(
-            "I can start with local tools first. Try: create a one-page business plan, SOP, proposal, or finance report and save it as a Word document.",
-            "chat",
-        )
+        return self._general_response(text)
 
     def recent_memory(self, limit: int = 10) -> list[dict[str, Any]]:
         if not self.memory_path.exists():
@@ -134,6 +131,23 @@ class OperatorAgent:
             mode=mode,
             model=asdict(decision),
             steps=[{"label": "Local response", "detail": "No paid model call used."}],
+            artifacts=[],
+            memory=[],
+            context_packets=[],
+        )
+
+    def _general_response(self, directive: str) -> OperatorResult:
+        decision = self.router.decide("general", "low")
+        message = self.synthesizer.synthesize_general(directive, decision)
+        return OperatorResult(
+            ok=True,
+            message=message,
+            mode="chat",
+            model=asdict(decision),
+            steps=[
+                {"label": "Interpreted directive", "detail": "No specialist agent matched this request."},
+                {"label": "Selected route", "detail": decision.reason},
+            ],
             artifacts=[],
             memory=[],
             context_packets=[],

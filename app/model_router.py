@@ -26,12 +26,28 @@ class ModelRouter:
 
     def __init__(self, root: Path | None = None) -> None:
         if root is not None:
-            load_env_file(root / ".env")
+            env_path = root / ".env"
+            if env_path.exists():
+                load_env_file(env_path)
+            else:
+                self.provider = "local"
+                self.paid_enabled = False
+                self.max_paid_calls = 0
+                return
         self.provider = os.getenv("ASTRA_MODEL_PROVIDER", "local").strip().lower() or "local"
         self.paid_enabled = env_bool("ENABLE_PAID_MODELS", False)
         self.max_paid_calls = env_int("ASTRA_MAX_PAID_CALLS_PER_DAY", 0)
 
     def decide(self, task_type: str, complexity: str = "low") -> ModelDecision:
+        if task_type == "chat":
+            return ModelDecision(
+                provider="local",
+                model="local-tools-v0",
+                reason="Tier 0 casual chat stays local.",
+                estimated_cost_usd=0.0,
+                paid_call_allowed=False,
+            )
+
         if self.provider == "local" or not self.paid_enabled or self.max_paid_calls <= 0:
             return ModelDecision(
                 provider="local",
@@ -63,6 +79,14 @@ class ModelRouter:
                 os.getenv("DEEPSEEK_MODEL_DEFAULT", "deepseek-v4-flash"),
                 "Low-cost coding lane.",
                 0.003,
+                True,
+            )
+        if task_type == "general":
+            return ModelDecision(
+                self.provider,
+                os.getenv(f"{self.provider.upper()}_MODEL", os.getenv("GEMINI_MODEL_DEFAULT", "gemini-2.5-flash")),
+                "General assistant route selected by configuration.",
+                0.005,
                 True,
             )
         return ModelDecision(

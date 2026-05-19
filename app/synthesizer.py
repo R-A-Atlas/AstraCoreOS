@@ -8,6 +8,17 @@ from app.model_router import ModelDecision
 
 
 class AnswerSynthesizer:
+    def synthesize_general(self, directive: str, decision: ModelDecision) -> str:
+        if decision.paid_call_allowed and decision.provider == "gemini":
+            try:
+                return self._general_with_gemini(directive, decision)
+            except ModelClientError as exc:
+                return f"I can answer that after the model route is available. Gemini fallback reason: {exc}"
+        return (
+            "I can answer that once the general assistant route is enabled. "
+            "Right now the reliable local path is the Business Documentation Agent."
+        )
+
     def synthesize(
         self,
         directive: str,
@@ -57,5 +68,20 @@ class AnswerSynthesizer:
             f"Created artifacts:\n{json.dumps(artifact_titles, indent=2)}\n\n"
             f"Context packets:\n{json.dumps(packet_payload, indent=2)}\n\n"
             "Write the final user-facing response."
+        )
+        return client.generate(prompt)
+
+    def _general_with_gemini(self, directive: str, decision: ModelDecision) -> str:
+        client = GeminiClient(model=decision.model)
+        prompt = (
+            "You are AstraCore, a practical agentic operating system assistant.\n"
+            "Answer the user naturally and directly.\n"
+            "Important limitations for this current prototype:\n"
+            "- You do not yet have live web search, Google Maps, broker data, or market data tools wired.\n"
+            "- If the user asks for current market data, local businesses near them, maps, or live lookup, explain that this tool is not wired yet and give a useful next step or ask what source/location/details they want.\n"
+            "- Do not pretend you looked something up if no tool was available.\n"
+            "- For business document requests, tell the user to ask for a business plan, SOP, proposal, or finance report if that is what they need.\n\n"
+            f"User message:\n{directive}\n\n"
+            "Write the final response."
         )
         return client.generate(prompt)

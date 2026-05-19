@@ -36,6 +36,23 @@ def test_greeting_is_local_and_cheap(tmp_path: Path):
     assert result.context_packets == []
 
 
+def test_greeting_stays_local_even_when_gemini_enabled(tmp_path: Path):
+    env = tmp_path / ".env"
+    env.write_text(
+        "GEMINI_API_KEY=fake-key\n"
+        "ASTRA_MODEL_PROVIDER=gemini\n"
+        "ENABLE_PAID_MODELS=true\n"
+        "ASTRA_MAX_PAID_CALLS_PER_DAY=5\n",
+        encoding="utf-8",
+    )
+    agent = OperatorAgent(tmp_path)
+
+    result = agent.run("hey how are you")
+
+    assert result.model["provider"] == "local"
+    assert result.model["paid_call_allowed"] is False
+
+
 def test_capability_question_is_plain_text(tmp_path: Path):
     agent = OperatorAgent(tmp_path)
 
@@ -118,3 +135,23 @@ def test_paid_models_stay_local_when_disabled(tmp_path: Path, monkeypatch):
 
     assert result.model["provider"] == "local"
     assert result.model["paid_call_allowed"] is False
+
+
+def test_general_prompt_routes_to_general_model_when_enabled(tmp_path: Path):
+    env = tmp_path / ".env"
+    env.write_text(
+        "GEMINI_API_KEY=fake-key\n"
+        "ASTRA_MODEL_PROVIDER=gemini\n"
+        "ENABLE_PAID_MODELS=true\n"
+        "ASTRA_MAX_PAID_CALLS_PER_DAY=5\n",
+        encoding="utf-8",
+    )
+    agent = OperatorAgent(tmp_path)
+
+    result = agent.run("was just wondering what happened yesterday in the markets with NQ")
+
+    assert result.mode == "chat"
+    assert result.model["provider"] == "gemini"
+    assert result.model["paid_call_allowed"] is True
+    assert result.artifacts == []
+    assert result.context_packets == []

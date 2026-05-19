@@ -25,7 +25,10 @@ class GeminiClient:
             raise ModelClientError("google-genai is not installed. Run pip install -r requirements.txt.") from exc
 
         client = genai.Client(api_key=self.api_key)
-        response = client.models.generate_content(model=self.model, contents=prompt)
+        try:
+            response = client.models.generate_content(model=self.model, contents=prompt)
+        except Exception as exc:
+            raise ModelClientError(f"Gemini request failed: {exc}") from exc
         text = getattr(response, "text", None)
         if not text:
             raise ModelClientError("Gemini returned an empty response.")
