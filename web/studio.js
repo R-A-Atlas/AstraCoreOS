@@ -350,11 +350,11 @@ async function generatePine() {
   const name = els.strategyName.value.trim() || "AstraCore Scalp Assist";
   const notes = els.strategyNotes.value.trim();
   if (!notes) {
-    els.pineResult.textContent = "Add the trade rules first. Plain English is fine.";
+    els.pineResult.textContent = "Add the trade rules first. Plain English is fine. Video/audio extraction is not wired yet.";
     return;
   }
   els.generatePineBtn.disabled = true;
-  els.pineResult.textContent = "Generating Pine v6 script...";
+  els.pineResult.textContent = "Building Pine v6 script from your notes...";
   try {
     const response = await fetch("/api/strategies/pine", {
       method: "POST",

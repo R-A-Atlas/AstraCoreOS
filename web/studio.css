@@ -197,21 +197,25 @@ svg {
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 22rem;
-  gap: 1.2rem;
-  padding: 2rem 2rem 7.5rem;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 0.75rem 1.2rem;
+  padding: 2rem;
   position: relative;
-  overflow: hidden;
+  overflow: auto;
 }
 
 .preview-wrap {
   width: min(100%, 76rem);
   justify-self: center;
   align-self: center;
+  grid-column: 1;
+  grid-row: 1;
 }
 
 .preview-frame {
   position: relative;
-  width: 100%;
+  width: min(100%, calc((100vh - 21rem) * 16 / 9));
+  margin: 0 auto;
   aspect-ratio: 16 / 9;
   overflow: hidden;
   background: #000;
@@ -362,7 +366,7 @@ svg {
   justify-content: center;
   flex-wrap: wrap;
   gap: 0.55rem;
-  margin-top: 1rem;
+  margin-top: 0.65rem;
 }
 
 .monitor-chip {
@@ -391,6 +395,8 @@ svg {
 }
 
 .strategy-drawer {
+  grid-column: 2;
+  grid-row: 1;
   align-self: stretch;
   min-height: 0;
   border: 1px solid var(--line);
@@ -491,10 +497,12 @@ textarea:focus {
 }
 
 .dock-wrap {
-  position: fixed;
-  left: 50%;
-  bottom: 1.75rem;
-  transform: translateX(-50%);
+  grid-column: 1 / -1;
+  grid-row: 2;
+  position: static;
+  justify-self: center;
+  align-self: end;
+  transform: none;
   z-index: 4;
 }
 
@@ -697,7 +705,21 @@ textarea:focus {
 @media (max-width: 1020px) {
   .studio-stage {
     grid-template-columns: 1fr;
-    padding: 1rem 1rem 7rem;
+    grid-template-rows: auto auto;
+    padding: 1rem;
+  }
+
+  .preview-wrap,
+  .dock-wrap {
+    grid-column: 1;
+  }
+
+  .preview-wrap {
+    grid-row: 1;
+  }
+
+  .dock-wrap {
+    grid-row: 2;
   }
 
   .strategy-drawer {
@@ -734,6 +756,10 @@ textarea:focus {
   .preview-empty {
     gap: 0.55rem;
     padding: 1rem;
+  }
+
+  .preview-frame {
+    width: 100%;
   }
 
   .empty-icon {
