@@ -41,8 +41,8 @@
             <div class="empty-icon">
               <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
             </div>
-            <h1>Connect a display to begin.</h1>
-            <p>Record your TradingView screen and talk through the trade. AstraCore keeps the capture, then helps turn the logic into a clean Pine strategy.</p>
+            <h1>Connect a chart display.</h1>
+            <p>Show previous days, indicators, ranges, entries, invalidation, and targets while you explain the strategy. AstraCore saves the walkthrough and turns the transcript into strategy files.</p>
             <button id="connect-display-btn" class="primary-btn" type="button">
               <span></span>
               Connect display
@@ -79,7 +79,17 @@
         <input id="strategy-notes" type="hidden" value="" />
         <div class="source-card">
           <strong>Source</strong>
-          <span>Latest saved capture transcript. Manual notes are intentionally hidden because the workflow is capture first.</span>
+          <span>Latest saved chart walkthrough transcript. Manual notes are intentionally hidden because the workflow is screen and voice first.</span>
+        </div>
+
+        <div class="source-card guide-card">
+          <strong>Walkthrough guide</strong>
+          <ul>
+            <li>Explain each indicator and why it matters.</li>
+            <li>Mark range high, range low, midpoint, and liquidity areas.</li>
+            <li>Say exactly where you would enter and why.</li>
+            <li>Say what invalidates the setup and where targets go.</li>
+          </ul>
         </div>
 
         <div class="export-grid" aria-label="Strategy export options">
@@ -87,7 +97,7 @@
           <button class="secondary-btn wide export-btn" type="button" data-export-type="mt5">MT5 / MQL5</button>
           <button class="secondary-btn wide export-btn" type="button" data-export-type="instructions">Visual Playbook</button>
         </div>
-        <div id="pine-result" class="result-box">Record a session, explain the setup, then choose one export. Current build uses the saved transcript through local backend code; AI video-frame analysis is the next layer.</div>
+        <div id="pine-result" class="result-box">Record a chart walkthrough, explain your strategy, then choose one export. Current build uses the saved transcript through local backend code; AI video-frame analysis is the next layer.</div>
       </aside>
 
       <button id="open-strategy-btn" class="floating-strategy-btn hidden" type="button">Exports</button>

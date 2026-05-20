@@ -549,6 +549,27 @@ textarea {
   font-size: 0.86rem;
 }
 
+.guide-card ul {
+  display: grid;
+  gap: 0.42rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.guide-card li {
+  color: var(--text-muted);
+  line-height: 1.45;
+  font-size: 0.82rem;
+}
+
+.guide-card li::before {
+  content: ">";
+  color: var(--brand);
+  margin-right: 0.45rem;
+  font-family: var(--mono);
+}
+
 input:focus,
 textarea:focus {
   border-color: rgba(167, 139, 250, 0.55);

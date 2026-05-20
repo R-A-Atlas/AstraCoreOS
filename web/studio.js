@@ -232,7 +232,7 @@ async function saveRecording() {
   }
 
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const filename = `trade-review-${stamp}.webm`;
+  const filename = `strategy-walkthrough-${stamp}.webm`;
   try {
     const params = new URLSearchParams({ filename });
     if (transcript) {
@@ -250,7 +250,7 @@ async function saveRecording() {
     const transcriptLink = data.capture.transcript_download_url
       ? `<br><a href="${data.capture.transcript_download_url}" download>Download transcript</a>`
       : "";
-    els.pineResult.innerHTML = `Capture saved: <a href="${data.capture.download_url}" download>${data.capture.filename}</a>${transcriptLink}<br>Choose Pine Script, MT5/MQL5, or Trade Instructions. The latest transcript will be used automatically.`;
+    els.pineResult.innerHTML = `Walkthrough saved: <a href="${data.capture.download_url}" download>${data.capture.filename}</a>${transcriptLink}<br>Choose Pine Script, MT5/MQL5, or Visual Playbook. The latest transcript will be used automatically.`;
     await loadCaptures();
     openTray();
   } catch (error) {
@@ -474,7 +474,7 @@ async function generateStrategyExport(exportType = "pine") {
     button.disabled = true;
   });
   const label = exportType === "mt5" ? "MT5/MQL5 Expert Advisor" : exportType === "instructions" ? "visual trade playbook" : "Pine Script";
-  els.pineResult.textContent = `Building ${label} from ${notes ? "typed notes" : "latest capture transcript"}...`;
+  els.pineResult.textContent = `Building ${label} from ${notes ? "typed notes" : "latest chart walkthrough transcript"}...`;
   try {
     const response = await fetch("/api/strategies/export", {
       method: "POST",

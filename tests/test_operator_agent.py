@@ -402,7 +402,9 @@ def test_studio_route_serves_focused_capture_ui():
 
     assert response.status_code == 200
     assert "AstraCore Studio" in response.text
-    assert "Connect a display to begin" in response.text
+    assert "Connect a chart display" in response.text
+    assert "Walkthrough guide" in response.text
+    assert "range high, range low" in response.text
     assert "/static/studio.js" in response.text
 
 
