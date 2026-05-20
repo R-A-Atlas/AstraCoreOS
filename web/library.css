@@ -36,8 +36,7 @@
 
 .library-panel-head,
 .section-title-row,
-.detail-hero,
-.ai-placeholder {
+.detail-hero {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -46,8 +45,7 @@
 
 .library-panel-head p,
 .section-title-row p,
-.detail-meta-card p,
-.ai-placeholder p {
+.detail-meta-card p {
   margin: 0 0 0.25rem;
   color: var(--brand);
   text-transform: uppercase;
@@ -58,8 +56,7 @@
 
 .library-panel-head h1,
 .section-title-row h3,
-.detail-meta-card h2,
-.ai-placeholder h3 {
+.detail-meta-card h2 {
   margin: 0;
   letter-spacing: -0.04em;
 }
@@ -144,8 +141,7 @@
 
 .detail-meta-card,
 .library-card,
-.library-actions,
-.ai-placeholder {
+.library-actions {
   border: 1px solid var(--line);
   border-radius: 1rem;
   background: rgba(255, 255, 255, 0.035);
@@ -291,14 +287,64 @@
   font-size: 0.78rem;
 }
 
-.ai-placeholder {
-  align-items: center;
+.review-output,
+.memory-insight {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.85rem;
 }
 
-.ai-placeholder span {
-  flex: 1;
+.review-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.review-pill,
+.memory-pill {
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  background: rgba(0, 0, 0, 0.18);
+  padding: 0.75rem;
+}
+
+.review-pill strong,
+.memory-pill strong {
+  display: block;
+  color: var(--text);
+  margin-bottom: 0.25rem;
+}
+
+.review-pill span,
+.memory-pill span,
+.review-list li,
+.timestamp-note span {
   color: var(--text-muted);
-  line-height: 1.45;
+}
+
+.review-list {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.timestamp-note {
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  padding: 0.8rem;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.timestamp-note b {
+  color: var(--brand);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.timestamp-note strong {
+  display: block;
+  margin-top: 0.25rem;
 }
 
 @media (max-width: 1060px) {
@@ -333,12 +379,12 @@
     padding: 0.75rem;
   }
 
-  .rename-row,
-  .ai-placeholder {
+  .rename-row {
     display: grid;
   }
 
-  .memory-grid {
+  .memory-grid,
+  .review-grid {
     grid-template-columns: 1fr;
   }
 }

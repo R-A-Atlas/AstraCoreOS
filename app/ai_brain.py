@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
@@ -93,13 +94,25 @@ class MultimodalAIBrain:
         return env_bool("ASTRA_AI_BRAIN_ENABLED", False) and env_bool("ASTRA_AI_EXPORTS_ENABLED", False)
 
     @property
+    def reviews_enabled(self) -> bool:
+        return env_bool("ASTRA_AI_BRAIN_ENABLED", False) and env_bool("ASTRA_AI_REVIEWS_ENABLED", False)
+
+    @property
     def fallback_to_local(self) -> bool:
         return env_bool("ASTRA_AI_FALLBACK_TO_LOCAL", False)
 
-    def generate_export(self, session: Any, transcript: str, name: str, export_type: str) -> AIBrainResult:
+    def generate_export(
+        self,
+        session: Any,
+        transcript: str,
+        name: str,
+        export_type: str,
+        review: dict[str, Any] | None = None,
+        memory_summary: dict[str, Any] | None = None,
+    ) -> AIBrainResult:
         clean_export_type = self._normalize_export_type(export_type)
-        self._validate_ready(session, transcript)
-        prompt = self._build_prompt(transcript, name, clean_export_type)
+        self._validate_ready(session, transcript, "export")
+        prompt = self._build_prompt(transcript, name, clean_export_type, review, memory_summary)
         try:
             raw = self.client.generate_from_video(Path(session.path), prompt)
         except ModelClientError as exc:
@@ -118,8 +131,30 @@ class MultimodalAIBrain:
             model=self.client.model,
         )
 
-    def _validate_ready(self, session: Any, transcript: str) -> None:
-        if not self.enabled:
+    def generate_review(
+        self,
+        session: Any,
+        transcript: str,
+        memory_summary: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        self._validate_ready(session, transcript, "review")
+        prompt = self._build_review_prompt(transcript, memory_summary)
+        try:
+            raw = self.client.generate_from_video(Path(session.path), prompt)
+        except ModelClientError as exc:
+            raise AIBrainError(str(exc)) from exc
+        review = self._parse_review_response(raw)
+        review["capture_id"] = str(getattr(session, "id", ""))
+        review["source"] = "ai_multimodal_review"
+        review["model"] = self.client.model
+        review["created_at"] = datetime.now(timezone.utc).isoformat()
+        return review
+
+    def _validate_ready(self, session: Any, transcript: str, mode: str) -> None:
+        if mode == "review":
+            if not self.reviews_enabled:
+                raise AIBrainError("AI reviews disabled.")
+        elif not self.enabled:
             raise AIBrainError("AI Brain disabled.")
         if os.getenv("ASTRA_AI_BRAIN_PROVIDER", "gemini").strip().lower() != "gemini":
             raise AIBrainError("Only Gemini multimodal AI Brain is wired in this build.")
@@ -130,7 +165,7 @@ class MultimodalAIBrain:
             raise AIBrainError("Selected capture video file is missing.")
         has_audio_or_transcript = bool(getattr(session, "mic_enabled", False)) or bool(transcript.strip())
         if env_bool("ASTRA_AI_REQUIRE_AUDIO_OR_TRANSCRIPT", True) and not has_audio_or_transcript:
-            raise AIBrainError("Selected capture needs mic audio or a transcript before AI export.")
+            raise AIBrainError(f"Selected capture needs mic audio or a transcript before AI {mode}.")
 
     @staticmethod
     def _normalize_export_type(export_type: str) -> str:
@@ -145,10 +180,7 @@ class MultimodalAIBrain:
 
     @staticmethod
     def _parse_response(raw: str, export_type: str) -> dict[str, str]:
-        text = raw.strip()
-        if text.startswith("```"):
-            text = re.sub(r"^```(?:json)?", "", text, flags=re.IGNORECASE).strip()
-            text = re.sub(r"```$", "", text).strip()
+        text = MultimodalAIBrain._strip_json_fence(raw)
         try:
             payload = json.loads(text)
         except json.JSONDecodeError as exc:
@@ -168,24 +200,68 @@ class MultimodalAIBrain:
         }
 
     @staticmethod
-    def _build_prompt(transcript: str, name: str, export_type: str) -> str:
+    def _parse_review_response(raw: str) -> dict[str, Any]:
+        text = MultimodalAIBrain._strip_json_fence(raw)
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise AIBrainError("AI review response was not valid JSON.") from exc
+        if not isinstance(payload, dict):
+            raise AIBrainError("AI review response must be a JSON object.")
+        return {
+            "summary": str(payload.get("summary") or ""),
+            "trade_grade": str(payload.get("trade_grade") or "Ungraded"),
+            "setup_type": str(payload.get("setup_type") or "Unclassified"),
+            "strengths": payload.get("strengths") if isinstance(payload.get("strengths"), list) else [],
+            "mistakes": payload.get("mistakes") if isinstance(payload.get("mistakes"), list) else [],
+            "timestamped_notes": payload.get("timestamped_notes") if isinstance(payload.get("timestamped_notes"), list) else [],
+            "strategy_rules": payload.get("strategy_rules") if isinstance(payload.get("strategy_rules"), list) else [],
+            "next_practice_focus": str(payload.get("next_practice_focus") or ""),
+            "voice_summary": str(payload.get("voice_summary") or payload.get("summary") or ""),
+        }
+
+    @staticmethod
+    def _strip_json_fence(raw: str) -> str:
+        text = raw.strip()
+        if text.startswith("```"):
+            text = re.sub(r"^```(?:json)?", "", text, flags=re.IGNORECASE).strip()
+            text = re.sub(r"```$", "", text).strip()
+        return text
+
+    @staticmethod
+    def _build_prompt(
+        transcript: str,
+        name: str,
+        export_type: str,
+        review: dict[str, Any] | None = None,
+        memory_summary: dict[str, Any] | None = None,
+    ) -> str:
         output_instruction = {
             "pine": "Return a complete TradingView Pine Script v6 strategy. Include entries, invalidation, targets, alerts, and minimal chart clutter.",
             "mt5": "Return a complete MT5/MQL5 Expert Advisor starter. Include entries, invalidation, targets, risk inputs, and comments.",
             "instructions": "Return a complete visual HTML strategy playbook. It should be readable, practical, and specific to what is shown and explained.",
         }[export_type]
         transcript_block = transcript.strip() or "Transcript sidecar missing. Use the video audio and chart visuals as primary context."
+        review_block = json.dumps(review or {}, indent=2)[:6000]
+        memory_block = json.dumps(memory_summary or {}, indent=2)[:6000]
         return f"""
 You are AstraCore's multimodal trading strategy extraction brain.
 
 Analyze the attached chart walkthrough video and its embedded audio. Use the transcript only as supporting text.
 Do not create rules from transcript alone. Use visual chart context: instrument/timeframe labels when visible, indicators, range size, range high/low, midpoint, liquidity zones, entry examples, invalidation, targets, and what the trader points to or describes.
+Use the saved AI review and trading memory as additional context when present. If memory conflicts with the selected video, prioritize the selected video.
 
 Requested export name: {name}
 Requested export type: {export_type}
 
 Transcript sidecar:
 {transcript_block}
+
+Saved AI review for this capture:
+{review_block}
+
+Trading memory summary:
+{memory_block}
 
 {output_instruction}
 
@@ -196,5 +272,45 @@ Return only JSON with this shape:
   "exports": {{
     "{export_type}": "full file content as a string"
   }}
+}}
+"""
+
+    @staticmethod
+    def _build_review_prompt(transcript: str, memory_summary: dict[str, Any] | None = None) -> str:
+        transcript_block = transcript.strip() or "Transcript sidecar missing. Use the video audio and chart visuals as primary context."
+        memory_block = json.dumps(memory_summary or {}, indent=2)[:6000]
+        return f"""
+You are AstraCore's direct trading coach.
+
+Review the attached chart walkthrough video and embedded audio. Use the transcript only as supporting text.
+Be direct and practical. Call out early entries, hesitation, unclear invalidation, weak context, chasing, and missed confirmation when visible or narrated.
+Do not invent a trade that is not visible or explained. If something is unclear, say it is unclear.
+Use timestamped notes whenever possible.
+
+Transcript sidecar:
+{transcript_block}
+
+Existing trading memory summary:
+{memory_block}
+
+Return only JSON with this exact shape:
+{{
+  "summary": "short direct review",
+  "trade_grade": "A/B/C/D/F or Ungraded",
+  "setup_type": "specific setup classification",
+  "strengths": ["specific thing done well"],
+  "mistakes": ["specific mistake or risk"],
+  "timestamped_notes": [
+    {{
+      "timecode": "MM:SS",
+      "label": "short label",
+      "observation": "what happened",
+      "coaching_note": "what to do next time",
+      "severity": "low|medium|high|critical"
+    }}
+  ],
+  "strategy_rules": ["rule this session suggests keeping"],
+  "next_practice_focus": "one focused action for the next session",
+  "voice_summary": "one short paragraph that can be spoken by a future Jarvis voice"
 }}
 """

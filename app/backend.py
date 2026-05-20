@@ -16,6 +16,7 @@ from app.notifications import notification_channels
 from app.operator_agent import OperatorAgent
 from app.pine_generator import PineStrategyGenerator
 from app.skills_registry import skill_catalog
+from app.trading_memory import TradingMemory
 from app.tradingview import TradingViewBridge
 
 
@@ -34,6 +35,7 @@ tradingview_bridge = TradingViewBridge(ROOT)
 capture_studio = CaptureStudio(ROOT)
 pine_generator = PineStrategyGenerator(ROOT)
 ai_brain = MultimodalAIBrain(ROOT, pine_generator)
+trading_memory = TradingMemory(ROOT)
 
 app.mount("/static", StaticFiles(directory=WEB), name="static")
 app.mount("/outputs", StaticFiles(directory=OUTPUTS), name="outputs")
@@ -211,12 +213,15 @@ async def save_capture(request: Request, filename: str = "", transcript: str = "
 
 
 def _capture_payload(session) -> dict:
+    review = trading_memory.get_review(session)
     return {
         **session.to_dict(),
         "download_url": f"/captures/{session.filename}",
         "transcript_download_url": (
             f"/captures/{session.transcript_filename}" if session.transcript_filename else ""
         ),
+        "has_ai_review": bool(review),
+        "review": review,
     }
 
 
@@ -268,6 +273,49 @@ def delete_capture(capture_id: str) -> dict:
     return {"ok": True, "deleted": session.id}
 
 
+@app.get("/api/trading-memory/summary")
+def trading_memory_summary() -> dict:
+    return {
+        "ok": True,
+        "summary": trading_memory.summary(),
+    }
+
+
+@app.get("/api/captures/{capture_id}/review")
+def get_capture_review(capture_id: str) -> dict:
+    session = capture_studio.get_capture(capture_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Capture not found.")
+    review = trading_memory.get_review(session)
+    if review is None:
+        raise HTTPException(status_code=404, detail="AI review not found.")
+    return {
+        "ok": True,
+        "capture": _capture_payload(session),
+        "review": review,
+    }
+
+
+@app.post("/api/captures/{capture_id}/review")
+def review_capture(capture_id: str) -> dict:
+    session = capture_studio.get_capture(capture_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Capture not found.")
+    try:
+        transcript = capture_studio.transcript_for(capture_id)
+        review = ai_brain.generate_review(session, transcript, trading_memory.summary())
+        saved_review = trading_memory.save_review(session, review)
+        session = capture_studio.record_review(capture_id, saved_review)
+    except (AIBrainError, KeyError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "ok": True,
+        "capture": _capture_payload(session),
+        "review": saved_review,
+        "memory": trading_memory.summary(),
+    }
+
+
 @app.post("/api/captures/{capture_id}/export")
 def export_capture(capture_id: str, req: CaptureExportRequest) -> dict:
     session = capture_studio.get_capture(capture_id)
@@ -287,7 +335,14 @@ def export_capture(capture_id: str, req: CaptureExportRequest) -> dict:
         artifact, export_type = _build_strategy_artifact(notes, req.name, req.export_type)
     elif export_mode == "ai":
         try:
-            result = ai_brain.generate_export(session, notes, req.name, req.export_type)
+            result = ai_brain.generate_export(
+                session,
+                notes,
+                req.name,
+                req.export_type,
+                trading_memory.get_review(session),
+                trading_memory.summary(),
+            )
         except AIBrainError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         artifact = result.artifact

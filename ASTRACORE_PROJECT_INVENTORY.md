@@ -1,6 +1,6 @@
 # AstraCore Project Inventory
 
-Last updated: 2026-05-19
+Last updated: 2026-05-20
 
 ## Project Identity
 
@@ -13,6 +13,8 @@ The current product is focused on one core workflow:
 3. Save the video and transcript.
 4. Manage old captures.
 5. Generate strategy artifacts from the transcript.
+6. Run AI coaching reviews on saved captures.
+7. Build local trading memory from reviewed sessions.
 
 The long-term goal is to become a personal trading coach and strategy memory system: a local command center that learns how the trader thinks, identifies repeated setups and mistakes, and turns screen recordings into cleaner rules, Pine Script, MT5/MQL5 code, and visual strategy playbooks.
 
@@ -34,7 +36,7 @@ Purpose:
   - transcript sidecars
   - Pine v6 / MT5 / Visual Playbook
   - local capture memory
-- Describes AI trade review as the next layer, not as already live.
+- Describes AI trade review and trading memory as the active product direction.
 
 ### Studio
 
@@ -82,10 +84,15 @@ Purpose:
   - Pine Script
   - MT5/MQL5
   - Visual HTML Playbook
-- Show placeholder AI memory fields:
-  - AI review status
-  - setup type
+- Run AI review on a selected capture when enabled.
+- Show AI coaching output:
   - trade grade
+  - setup type
+  - strengths
+  - mistakes
+  - timestamped notes
+  - next practice focus
+- Show Trading Memory pattern insight from reviewed sessions.
 
 ## Backend Capabilities
 
@@ -111,6 +118,16 @@ Strategy export generation:
   - `.pine` Pine Script v6 strategy starter
   - `.mq5` MT5/MQL5 Expert Advisor starter
   - `.html` visual trade playbook
+
+AI review and trading memory:
+
+- `app/ai_brain.py`
+- Runs Gemini multimodal export generation and AI trade reviews.
+- AI review requires selected video plus mic audio or transcript context.
+- `app/trading_memory.py`
+- Stores review JSON beside captures.
+- Stores aggregate memory under `workspace/memory/trading_reviews.jsonl`.
+- Produces common setups, repeated mistakes, best scoring setups, rules to keep, rules to avoid, and a coach summary.
 
 TradingView integration:
 
@@ -162,15 +179,17 @@ What is true today:
 - The app itself is a local FastAPI/browser app.
 - Studio quick exports still use deterministic Local Template generation.
 - Capture Library exports can use a Gemini multimodal AI Brain when `ASTRA_AI_BRAIN_ENABLED=true`, `ASTRA_AI_EXPORTS_ENABLED=true`, and `GEMINI_API_KEY` is configured.
+- Capture Library reviews can use the Gemini multimodal AI Brain when `ASTRA_AI_BRAIN_ENABLED=true`, `ASTRA_AI_REVIEWS_ENABLED=true`, and `GEMINI_API_KEY` is configured.
 - AI export requires selected video plus mic audio or transcript context. Transcript-only AI strategy generation is intentionally blocked.
+- AI review also requires selected video plus mic audio or transcript context.
 
 What is not true yet:
 
 - The app does not call this Codex chat session.
 - The app does not yet send video frames to GPT-5.5 or Claude.
-- The app does not yet perform full AI chart analysis.
-- The app does not yet perform timestamped trade critique.
-- The app does not yet learn across sessions in a deep model-driven way.
+- The app now has a first-pass AI coaching review path.
+- The app now stores local trading memory from AI reviews.
+- It does not yet run live real-time chart observation while recording.
 
 Recommended future model setup:
 
@@ -208,6 +227,18 @@ Capture metadata currently supports:
 
 This metadata is the foundation for the future AI memory layer.
 
+Trading review memory supports:
+
+- `summary`
+- `trade_grade`
+- `setup_type`
+- `strengths`
+- `mistakes`
+- `timestamped_notes`
+- `strategy_rules`
+- `next_practice_focus`
+- `voice_summary`
+
 ## API Inventory
 
 Primary app routes:
@@ -233,6 +264,9 @@ Capture management:
 - `PATCH /api/captures/{capture_id}`
 - `DELETE /api/captures/{capture_id}`
 - `POST /api/captures/{capture_id}/export`
+- `GET /api/captures/{capture_id}/review`
+- `POST /api/captures/{capture_id}/review`
+- `GET /api/trading-memory/summary`
 
 Strategy generation:
 
@@ -289,7 +323,7 @@ python -m pytest tests/ -q
 Last verified result:
 
 ```text
-32 passed
+49 passed
 ```
 
 JavaScript syntax checks:
@@ -320,6 +354,11 @@ Current test coverage includes:
 - recent tray link to library
 - selected-capture export behavior
 - export failure when capture has no transcript
+- multimodal AI export guardrails
+- AI review guardrails
+- AI review metadata persistence
+- trading memory aggregation
+- AI export context from saved review and memory
 - old dashboard files removed
 
 ## What Is Not Built Yet
@@ -330,10 +369,9 @@ These are not currently implemented:
 - Claude Sonnet 4.6 reviewer integration.
 - Separate video-frame extraction pipeline.
 - Timestamped chart image analysis.
-- Timestamped AI trade critique.
-- Real strategy learning over multiple sessions.
-- Automatic setup classification from video.
-- Behavioral coaching based on repeated mistakes.
+- Live voice Jarvis/orb.
+- Real-time chart observation while recording.
+- Deeper strategy learning across many sessions.
 - Notion export.
 - Obsidian vault export.
 - AI-edited replay video with captions.
@@ -345,27 +383,21 @@ These are not currently implemented:
 
 ## Next Recommended Build
 
-The next build should extend the AI Brain layer from export generation into trade review memory.
+The next build should add the Jarvis voice/orb layer on top of stored coaching memory.
 
 Recommended sequence:
 
-1. Add timestamped AI review for a selected capture.
-2. Store the AI review result back into capture metadata.
-3. Add frame extraction from saved `.webm` files for timestamp references.
-4. Send selected frames plus transcript to the AI brain for critique.
-5. Produce timestamped trade critique:
-   - what the trader saw
-   - what rule was implied
-   - what was valid
-   - what was early/late/unclear
-   - what should become a strategy rule
-7. Use the critique to improve Pine, MT5/MQL5, and Visual Playbook outputs.
+1. Add a floating reactive AstraCore orb.
+2. Add browser text-to-speech for saved review voice summaries.
+3. Make the orb react to AI speech output.
+4. Add push-to-talk or hold-to-talk chat about the selected capture.
+5. Let the voice layer read from review memory and answer questions about repeated mistakes.
 
 ## Current Honest Status
 
-AstraCore is currently a working local trading capture and strategy-export app.
+AstraCore is currently a working local trading capture, strategy-export, AI review, and local trading-memory app.
 
-It is not yet a true AI trading coach.
+It is not yet a live Jarvis-style trading companion, but it now has the first working AI coaching and local trading memory layer.
 
 The foundation is now in place for that next layer:
 
@@ -374,7 +406,9 @@ The foundation is now in place for that next layer:
 - capture library
 - metadata memory
 - export regeneration
+- AI review persistence
+- local trading memory summaries
 - model/provider configuration awareness
 - test coverage
 
-The next major step is connecting a real model-backed AI review service to the saved capture memory.
+The next major step is adding the voice/orb interaction layer on top of the saved coaching memory.

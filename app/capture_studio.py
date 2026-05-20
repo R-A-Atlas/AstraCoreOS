@@ -142,6 +142,8 @@ class CaptureStudio:
             raise KeyError("Capture not found.")
         self._delete_file(target.path)
         self._delete_file(target.transcript_path)
+        if target.path:
+            self._delete_file(str(Path(target.path).with_suffix(".review.json")))
         self._write_sessions(kept)
         return target
 
@@ -174,6 +176,36 @@ class CaptureStudio:
             )
             session.generated_exports = session.generated_exports[-20:]
             session.last_exported_at = created_at
+            target = session
+            break
+        if target is None:
+            raise KeyError("Capture not found.")
+        self._write_sessions(sessions)
+        return target
+
+    def record_review(self, capture_id: str, review: dict) -> CaptureSession:
+        sessions = self.all_captures()
+        target: CaptureSession | None = None
+        for session in sessions:
+            if session.id != capture_id:
+                continue
+            session.ai_review_status = "complete"
+            session.setup_type = str(review.get("setup_type") or session.setup_type or "Unclassified")[:80]
+            session.trade_grade = str(review.get("trade_grade") or session.trade_grade or "Ungraded")[:32]
+            session.notes_summary = str(review.get("summary") or session.notes_summary)[:500]
+            markers = []
+            for note in review.get("timestamped_notes") or []:
+                if not isinstance(note, dict):
+                    continue
+                if str(note.get("severity", "")).lower() in {"high", "critical"}:
+                    markers.append(
+                        {
+                            "timecode": str(note.get("timecode") or "00:00")[:16],
+                            "label": str(note.get("label") or "Mistake")[:80],
+                            "severity": str(note.get("severity") or "high")[:20],
+                        }
+                    )
+            session.mistake_markers = markers[:12]
             target = session
             break
         if target is None:

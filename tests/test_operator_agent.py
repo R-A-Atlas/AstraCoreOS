@@ -12,6 +12,7 @@ from app.notifications import notification_channels
 from app.operator_agent import OperatorAgent
 from app.pine_generator import PineStrategyGenerator
 from app.skills_registry import skill_catalog
+from app.trading_memory import TradingMemory
 from app.tradingview import TradingViewBridge
 
 
@@ -140,6 +141,7 @@ def test_ai_brain_config_defaults_are_safe_and_keyless(tmp_path: Path, monkeypat
         "ASTRA_AI_BRAIN_ENABLED",
         "ASTRA_AI_EXPORTS_ENABLED",
         "ASTRA_AI_BRAIN_PROVIDER",
+        "ASTRA_AI_REVIEWS_ENABLED",
         "ASTRA_AI_REQUIRE_VIDEO",
         "ASTRA_AI_REQUIRE_AUDIO_OR_TRANSCRIPT",
         "ASTRA_AI_FALLBACK_TO_LOCAL",
@@ -155,6 +157,7 @@ def test_ai_brain_config_defaults_are_safe_and_keyless(tmp_path: Path, monkeypat
 
     assert status["ai_brain"]["enabled"] is False
     assert status["ai_brain"]["exports_enabled"] is False
+    assert status["ai_brain"]["reviews_enabled"] is False
     assert status["ai_brain"]["provider"] == "gemini"
     assert status["ai_brain"]["require_video"] is True
     assert status["ai_brain"]["require_audio_or_transcript"] is True
@@ -523,6 +526,84 @@ def test_multimodal_ai_brain_rejects_video_without_audio_or_transcript(tmp_path:
         raise AssertionError("Expected missing audio/transcript context to block AI export.")
 
 
+def test_multimodal_ai_brain_generates_trading_review(tmp_path: Path, monkeypatch):
+    class FakeGeminiClient:
+        model = "gemini-review-test"
+
+        @property
+        def configured(self) -> bool:
+            return True
+
+        def generate_from_video(self, video_path: Path, prompt: str) -> str:
+            assert video_path.exists()
+            assert "direct trading coach" in prompt
+            assert "Existing trading memory summary" in prompt
+            return (
+                '{"summary":"You waited for confirmation but entered slightly late.",'
+                '"trade_grade":"B","setup_type":"Range reclaim",'
+                '"strengths":["Waited for reclaim"],'
+                '"mistakes":["Entry came after the best impulse"],'
+                '"timestamped_notes":[{"timecode":"01:12","label":"Entry timing",'
+                '"observation":"Price had already expanded from the range high.",'
+                '"coaching_note":"Enter closer to reclaim or skip.","severity":"high"}],'
+                '"strategy_rules":["Long only after reclaim holds"],'
+                '"next_practice_focus":"Practice entering closer to the reclaim.",'
+                '"voice_summary":"Good read, but tighten the entry timing."}'
+            )
+
+    monkeypatch.setenv("ASTRA_AI_BRAIN_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_AI_REVIEWS_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_AI_BRAIN_PROVIDER", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
+    studio = CaptureStudio(tmp_path)
+    session = studio.save_capture(b"fake-webm-data", "review.webm", "I waited for reclaim.", mic_enabled=True)
+    brain = MultimodalAIBrain(tmp_path, PineStrategyGenerator(tmp_path), client=FakeGeminiClient())
+
+    review = brain.generate_review(session, studio.transcript_for(session.id), {"total_reviews": 0})
+
+    assert review["source"] == "ai_multimodal_review"
+    assert review["model"] == "gemini-review-test"
+    assert review["trade_grade"] == "B"
+    assert review["setup_type"] == "Range reclaim"
+    assert review["timestamped_notes"][0]["timecode"] == "01:12"
+
+
+def test_trading_memory_saves_review_and_aggregates_summary(tmp_path: Path):
+    studio = CaptureStudio(tmp_path)
+    memory = TradingMemory(tmp_path)
+    first = studio.save_capture(b"fake-webm-data", "first.webm", "First.", mic_enabled=True)
+    second = studio.save_capture(b"fake-webm-data", "second.webm", "Second.", mic_enabled=True)
+
+    memory.save_review(
+        first,
+        {
+            "summary": "Good reclaim.",
+            "trade_grade": "A",
+            "setup_type": "Range reclaim",
+            "mistakes": ["Chased entry"],
+            "strategy_rules": ["Wait for reclaim"],
+            "timestamped_notes": [{"timecode": "00:30", "label": "Chase", "coaching_note": "Do not chase.", "severity": "high"}],
+        },
+    )
+    memory.save_review(
+        second,
+        {
+            "summary": "Late entry.",
+            "trade_grade": "C",
+            "setup_type": "Range reclaim",
+            "mistakes": ["Chased entry"],
+            "strategy_rules": ["Wait for reclaim"],
+        },
+    )
+    summary = memory.summary()
+
+    assert summary["total_reviews"] == 2
+    assert summary["common_setups"][0]["setup_type"] == "Range reclaim"
+    assert summary["repeated_mistakes"][0]["mistake"] == "Chased entry"
+    assert summary["rules_to_keep"][0]["rule"] == "Wait for reclaim"
+    assert "Range reclaim" in summary["coach_summary"]
+
+
 def test_strategy_export_uses_latest_capture_transcript_when_notes_empty(tmp_path: Path):
     studio = CaptureStudio(tmp_path)
     generator = PineStrategyGenerator(tmp_path)
@@ -577,6 +658,8 @@ def test_library_route_serves_capture_library():
     assert response.status_code == 200
     assert "AstraCore Capture Library" in response.text
     assert "/static/library.js" in response.text
+    assert "Run AI Review" in response.text
+    assert "Pattern insight" in response.text
     assert 'href="/studio"' in response.text
     assert 'href="/">' not in response.text
 
@@ -684,6 +767,156 @@ def test_capture_ai_export_missing_gemini_key_fails_cleanly(tmp_path: Path, monk
     assert response.json()["detail"] == "Gemini API key missing."
 
 
+def test_capture_ai_review_disabled_fails_cleanly(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("ASTRA_AI_BRAIN_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_AI_REVIEWS_ENABLED", "false")
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
+    test_studio = CaptureStudio(tmp_path)
+    test_generator = PineStrategyGenerator(tmp_path)
+    test_memory = TradingMemory(tmp_path)
+    monkeypatch.setattr("app.backend.capture_studio", test_studio)
+    monkeypatch.setattr("app.backend.trading_memory", test_memory)
+    monkeypatch.setattr("app.backend.ai_brain", MultimodalAIBrain(tmp_path, test_generator))
+    client = TestClient(app)
+    session = test_studio.save_capture(b"fake-webm-data", "review.webm", "Long after reclaim.", mic_enabled=True)
+
+    response = client.post(f"/api/captures/{session.id}/review")
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "AI reviews disabled."
+
+
+def test_capture_ai_review_missing_key_fails_cleanly(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("ASTRA_AI_BRAIN_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_AI_REVIEWS_ENABLED", "true")
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    test_studio = CaptureStudio(tmp_path)
+    test_generator = PineStrategyGenerator(tmp_path)
+    test_memory = TradingMemory(tmp_path)
+    monkeypatch.setattr("app.backend.capture_studio", test_studio)
+    monkeypatch.setattr("app.backend.trading_memory", test_memory)
+    monkeypatch.setattr("app.backend.ai_brain", MultimodalAIBrain(tmp_path, test_generator))
+    client = TestClient(app)
+    session = test_studio.save_capture(b"fake-webm-data", "review.webm", "Long after reclaim.", mic_enabled=True)
+
+    response = client.post(f"/api/captures/{session.id}/review")
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Gemini API key missing."
+
+
+def test_capture_ai_review_saves_metadata_and_memory(tmp_path: Path, monkeypatch):
+    class FakeGeminiClient:
+        model = "gemini-review-test"
+
+        @property
+        def configured(self) -> bool:
+            return True
+
+        def generate_from_video(self, video_path: Path, prompt: str) -> str:
+            assert video_path.name.endswith(".webm")
+            assert "direct trading coach" in prompt
+            return (
+                '{"summary":"Direct coach summary.","trade_grade":"B","setup_type":"Range reclaim",'
+                '"strengths":["Clear context"],"mistakes":["Late entry"],'
+                '"timestamped_notes":[{"timecode":"00:45","label":"Late entry",'
+                '"observation":"Entry came after expansion.","coaching_note":"Take it closer to reclaim.",'
+                '"severity":"high"}],"strategy_rules":["Skip late expansion"],'
+                '"next_practice_focus":"Wait for cleaner entry location.",'
+                '"voice_summary":"Good context, late execution."}'
+            )
+
+    monkeypatch.setenv("ASTRA_AI_BRAIN_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_AI_REVIEWS_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_AI_BRAIN_PROVIDER", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
+    test_studio = CaptureStudio(tmp_path)
+    test_generator = PineStrategyGenerator(tmp_path)
+    test_memory = TradingMemory(tmp_path)
+    monkeypatch.setattr("app.backend.capture_studio", test_studio)
+    monkeypatch.setattr("app.backend.trading_memory", test_memory)
+    monkeypatch.setattr("app.backend.ai_brain", MultimodalAIBrain(tmp_path, test_generator, client=FakeGeminiClient()))
+    client = TestClient(app)
+    session = test_studio.save_capture(b"fake-webm-data", "review.webm", "I entered after the reclaim.", mic_enabled=True)
+
+    response = client.post(f"/api/captures/{session.id}/review")
+    payload = response.json()
+
+    assert response.status_code == 200
+    assert payload["review"]["source"] == "ai_multimodal_review"
+    assert payload["capture"]["ai_review_status"] == "complete"
+    assert payload["capture"]["setup_type"] == "Range reclaim"
+    assert payload["capture"]["trade_grade"] == "B"
+    assert payload["capture"]["mistake_markers"][0]["label"] == "Late entry"
+    assert payload["memory"]["total_reviews"] == 1
+    assert test_memory.get_review(test_studio.get_capture(session.id))["summary"] == "Direct coach summary."
+
+    fetched = client.get(f"/api/captures/{session.id}/review")
+    memory_response = client.get("/api/trading-memory/summary")
+
+    assert fetched.status_code == 200
+    assert fetched.json()["review"]["trade_grade"] == "B"
+    assert memory_response.status_code == 200
+    assert memory_response.json()["summary"]["common_setups"][0]["setup_type"] == "Range reclaim"
+
+
+def test_capture_ai_review_rejects_missing_video(tmp_path: Path, monkeypatch):
+    class FakeGeminiClient:
+        model = "gemini-review-test"
+
+        @property
+        def configured(self) -> bool:
+            return True
+
+        def generate_from_video(self, video_path: Path, prompt: str) -> str:
+            raise AssertionError("Review should not call the model without video.")
+
+    monkeypatch.setenv("ASTRA_AI_BRAIN_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_AI_REVIEWS_ENABLED", "true")
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
+    test_studio = CaptureStudio(tmp_path)
+    test_memory = TradingMemory(tmp_path)
+    monkeypatch.setattr("app.backend.capture_studio", test_studio)
+    monkeypatch.setattr("app.backend.trading_memory", test_memory)
+    monkeypatch.setattr("app.backend.ai_brain", MultimodalAIBrain(tmp_path, PineStrategyGenerator(tmp_path), client=FakeGeminiClient()))
+    client = TestClient(app)
+    session = test_studio.save_capture(b"fake-webm-data", "missing.webm", "Transcript exists.", mic_enabled=True)
+    Path(session.path).unlink()
+
+    response = client.post(f"/api/captures/{session.id}/review")
+
+    assert response.status_code == 400
+    assert "video file is missing" in response.json()["detail"].lower()
+
+
+def test_capture_ai_review_rejects_video_without_audio_or_transcript(tmp_path: Path, monkeypatch):
+    class FakeGeminiClient:
+        model = "gemini-review-test"
+
+        @property
+        def configured(self) -> bool:
+            return True
+
+        def generate_from_video(self, video_path: Path, prompt: str) -> str:
+            raise AssertionError("Review should require audio or transcript context.")
+
+    monkeypatch.setenv("ASTRA_AI_BRAIN_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_AI_REVIEWS_ENABLED", "true")
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
+    test_studio = CaptureStudio(tmp_path)
+    test_memory = TradingMemory(tmp_path)
+    monkeypatch.setattr("app.backend.capture_studio", test_studio)
+    monkeypatch.setattr("app.backend.trading_memory", test_memory)
+    monkeypatch.setattr("app.backend.ai_brain", MultimodalAIBrain(tmp_path, PineStrategyGenerator(tmp_path), client=FakeGeminiClient()))
+    client = TestClient(app)
+    session = test_studio.save_capture(b"fake-webm-data", "silent.webm")
+
+    response = client.post(f"/api/captures/{session.id}/review")
+
+    assert response.status_code == 400
+    assert "mic audio or a transcript" in response.json()["detail"]
+
+
 def test_capture_ai_export_uses_selected_capture_video_and_records_source(tmp_path: Path, monkeypatch):
     class FakeGeminiClient:
         model = "gemini-test"
@@ -695,6 +928,9 @@ def test_capture_ai_export_uses_selected_capture_video_and_records_source(tmp_pa
         def generate_from_video(self, video_path: Path, prompt: str) -> str:
             assert video_path.name.endswith(".webm")
             assert "Selected transcript reclaiming high" in prompt
+            assert "Saved AI review for this capture" in prompt
+            assert "Wait for cleaner reclaim" in prompt
+            assert "Trading memory summary" in prompt
             return (
                 '{"title":"Selected AI Strategy","summary":"Selected capture AI export.",'
                 '"exports":{"instructions":"<!doctype html><html><body>AI playbook</body></html>"}}'
@@ -706,7 +942,9 @@ def test_capture_ai_export_uses_selected_capture_video_and_records_source(tmp_pa
     monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
     test_studio = CaptureStudio(tmp_path)
     test_generator = PineStrategyGenerator(tmp_path)
+    test_memory = TradingMemory(tmp_path)
     monkeypatch.setattr("app.backend.capture_studio", test_studio)
+    monkeypatch.setattr("app.backend.trading_memory", test_memory)
     monkeypatch.setattr("app.backend.ai_brain", MultimodalAIBrain(tmp_path, test_generator, client=FakeGeminiClient()))
     client = TestClient(app)
     session = test_studio.save_capture(
@@ -715,6 +953,16 @@ def test_capture_ai_export_uses_selected_capture_video_and_records_source(tmp_pa
         "Selected transcript reclaiming high.",
         mic_enabled=True,
     )
+    saved_review = test_memory.save_review(
+        session,
+        {
+            "summary": "Wait for cleaner reclaim.",
+            "trade_grade": "B",
+            "setup_type": "Range reclaim",
+            "strategy_rules": ["Wait for cleaner reclaim"],
+        },
+    )
+    test_studio.record_review(session.id, saved_review)
 
     response = client.post(
         f"/api/captures/{session.id}/export",

@@ -108,13 +108,26 @@
             </article>
           </section>
 
-          <article class="library-card ai-placeholder">
-            <div>
-              <p>Next layer</p>
-              <h3>Timestamped AI trade review</h3>
+          <article class="library-card ai-review-card">
+            <div class="section-title-row">
+              <div>
+                <p>AI Coach</p>
+                <h3>Timestamped trade review</h3>
+              </div>
+              <button id="run-review-btn" class="secondary-btn" type="button">Run AI Review</button>
             </div>
-            <span>Next layer after exports: critiques with exact timestamps, repeated setup tagging, and trader behavior memory.</span>
-            <button class="secondary-btn" type="button" disabled>AI Review next</button>
+            <div id="review-status" class="result-box">Select a ready capture to run AI coaching.</div>
+            <div id="review-output" class="review-output"></div>
+          </article>
+
+          <article class="library-card memory-insight-card">
+            <div class="section-title-row">
+              <div>
+                <p>Trading Memory</p>
+                <h3>Pattern insight</h3>
+              </div>
+            </div>
+            <div id="memory-insight" class="memory-insight">No reviewed sessions yet.</div>
           </article>
         </div>
       </section>

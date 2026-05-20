@@ -5,7 +5,9 @@ const state = {
   aiBrain: {
     enabled: false,
     exportsEnabled: false,
+    reviewsEnabled: false,
   },
+  memorySummary: null,
 };
 
 const els = {
@@ -29,6 +31,10 @@ const els = {
   exportResult: document.querySelector("#library-export-result"),
   generatedExports: document.querySelector("#generated-exports"),
   localTemplateMode: document.querySelector("#local-template-mode"),
+  runReview: document.querySelector("#run-review-btn"),
+  reviewStatus: document.querySelector("#review-status"),
+  reviewOutput: document.querySelector("#review-output"),
+  memoryInsight: document.querySelector("#memory-insight"),
 };
 
 async function loadConfigStatus() {
@@ -38,11 +44,24 @@ async function loadConfigStatus() {
     const aiBrain = data.status?.ai_brain || {};
     state.aiBrain.enabled = Boolean(aiBrain.enabled);
     state.aiBrain.exportsEnabled = Boolean(aiBrain.exports_enabled);
+    state.aiBrain.reviewsEnabled = Boolean(aiBrain.reviews_enabled);
   } catch {
     state.aiBrain.enabled = false;
     state.aiBrain.exportsEnabled = false;
+    state.aiBrain.reviewsEnabled = false;
   }
   renderExportLabels();
+}
+
+async function loadMemorySummary() {
+  try {
+    const response = await fetch("/api/trading-memory/summary");
+    const data = await response.json();
+    state.memorySummary = data.summary || null;
+  } catch {
+    state.memorySummary = null;
+  }
+  renderMemoryInsight();
 }
 
 async function loadCaptures() {
@@ -115,6 +134,8 @@ async function selectCapture(captureId) {
   renderTranscript(capture);
   renderGeneratedExports(capture);
   renderAiReadiness(capture);
+  renderReview(capture.review || null);
+  renderReviewReadiness(capture);
   renderList();
 }
 
@@ -157,6 +178,48 @@ function renderGeneratedExports(capture) {
   `).join("");
 }
 
+function renderReview(review) {
+  if (!review) {
+    els.reviewOutput.innerHTML = "";
+    return;
+  }
+  const notes = Array.isArray(review.timestamped_notes) ? review.timestamped_notes : [];
+  els.reviewOutput.innerHTML = `
+    <div class="review-grid">
+      <div class="review-pill"><strong>${escapeHtml(review.trade_grade || "Ungraded")}</strong><span>Trade grade</span></div>
+      <div class="review-pill"><strong>${escapeHtml(review.setup_type || "Unclassified")}</strong><span>Setup type</span></div>
+      <div class="review-pill"><strong>${escapeHtml(review.source || "ai_multimodal_review")}</strong><span>Source</span></div>
+    </div>
+    <div class="result-box">${escapeHtml(review.summary || "No summary returned.")}</div>
+    ${renderReviewList("Strengths", review.strengths)}
+    ${renderReviewList("Mistakes", review.mistakes)}
+    ${renderReviewList("Strategy rules", review.strategy_rules)}
+    <div class="result-box"><strong>Next focus</strong><br>${escapeHtml(review.next_practice_focus || "No practice focus returned.")}</div>
+    ${notes.map((note) => `
+      <div class="timestamp-note">
+        <b>${escapeHtml(note.timecode || "00:00")} - ${escapeHtml(note.severity || "medium")}</b>
+        <strong>${escapeHtml(note.label || "Observation")}</strong>
+        <span>${escapeHtml(note.observation || "")}</span><br>
+        <span>${escapeHtml(note.coaching_note || "")}</span>
+      </div>
+    `).join("")}
+  `;
+}
+
+function renderReviewList(title, items) {
+  if (!Array.isArray(items) || !items.length) {
+    return "";
+  }
+  return `
+    <div>
+      <strong>${escapeHtml(title)}</strong>
+      <ul class="review-list">
+        ${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+      </ul>
+    </div>
+  `;
+}
+
 function renderExportLabels() {
   const localMode = Boolean(els.localTemplateMode?.checked);
   els.exportBtns.forEach((button) => {
@@ -183,6 +246,58 @@ function renderAiReadiness(capture) {
     return;
   }
   els.exportResult.textContent = "Ready for AI export. AstraCore will send the selected video plus voice/transcript context to the multimodal AI Brain.";
+}
+
+function renderReviewReadiness(capture) {
+  els.runReview.disabled = true;
+  if (!state.aiBrain.enabled || !state.aiBrain.reviewsEnabled) {
+    els.reviewStatus.textContent = "AI reviews disabled. Enable ASTRA_AI_BRAIN_ENABLED and ASTRA_AI_REVIEWS_ENABLED in .env, then restart the server.";
+    return;
+  }
+  if (!capture.ready_for_ai) {
+    els.reviewStatus.textContent = "This capture is not ready for AI review. It needs saved video plus mic audio or transcript context.";
+    return;
+  }
+  els.runReview.disabled = false;
+  els.reviewStatus.textContent = capture.has_ai_review
+    ? "AI review saved. Run again to refresh the coaching memory."
+    : "Ready for AI review. AstraCore will analyze the selected video plus voice/transcript context.";
+}
+
+function renderMemoryInsight() {
+  const summary = state.memorySummary;
+  if (!summary || !summary.total_reviews) {
+    els.memoryInsight.textContent = "No AI-reviewed trading sessions yet.";
+    return;
+  }
+  els.memoryInsight.innerHTML = `
+    <div class="result-box">${escapeHtml(summary.coach_summary || "")}</div>
+    <div class="review-grid">
+      ${renderMemoryPill("Reviews", summary.total_reviews)}
+      ${renderMemoryPill("Top setup", summary.common_setups?.[0]?.setup_type || "none")}
+      ${renderMemoryPill("Main mistake", summary.repeated_mistakes?.[0]?.mistake || "none")}
+    </div>
+    ${renderMemoryRows("Rules to keep", summary.rules_to_keep, "rule")}
+    ${renderMemoryRows("Rules to avoid", summary.rules_to_avoid, "rule")}
+  `;
+}
+
+function renderMemoryPill(label, value) {
+  return `<div class="memory-pill"><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>`;
+}
+
+function renderMemoryRows(title, rows, key) {
+  if (!Array.isArray(rows) || !rows.length) {
+    return "";
+  }
+  return `
+    <div>
+      <strong>${escapeHtml(title)}</strong>
+      <ul class="review-list">
+        ${rows.slice(0, 5).map((row) => `<li>${escapeHtml(row[key] || "")} (${escapeHtml(row.count || 1)})</li>`).join("")}
+      </ul>
+    </div>
+  `;
 }
 
 async function saveName() {
@@ -276,6 +391,35 @@ async function exportSelected(exportType) {
   }
 }
 
+async function runAiReview() {
+  if (!state.selected) {
+    return;
+  }
+  els.runReview.disabled = true;
+  els.reviewStatus.textContent = "Running AI review from selected video plus voice/transcript context...";
+  try {
+    const response = await fetch(`/api/captures/${state.selected.id}/review`, { method: "POST" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.detail || "AI review failed.");
+    }
+    state.captures = state.captures.map((capture) => capture.id === data.capture.id ? data.capture : capture);
+    state.selected = data.capture;
+    state.memorySummary = data.memory || state.memorySummary;
+    els.aiStatus.textContent = data.capture.ai_review_status || "complete";
+    els.setupType.textContent = data.capture.setup_type || "unset";
+    els.tradeGrade.textContent = data.capture.trade_grade || "unset";
+    els.reviewStatus.textContent = "AI review complete. Coaching memory updated.";
+    renderReview(data.review);
+    renderMemoryInsight();
+    renderList();
+  } catch (error) {
+    els.reviewStatus.textContent = error.message || "Could not run AI review.";
+  } finally {
+    renderReviewReadiness(state.selected);
+  }
+}
+
 function formatBytes(bytes) {
   if (!bytes) {
     return "0 B";
@@ -305,6 +449,8 @@ els.exportBtns.forEach((button) => {
   button.addEventListener("click", () => exportSelected(button.dataset.exportType || "pine"));
 });
 els.localTemplateMode?.addEventListener("change", renderExportLabels);
+els.runReview.addEventListener("click", runAiReview);
 
 loadConfigStatus();
+loadMemorySummary();
 loadCaptures();

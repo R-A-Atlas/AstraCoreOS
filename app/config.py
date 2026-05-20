@@ -85,6 +85,10 @@ class AppConfig:
         return env_bool("ASTRA_AI_EXPORTS_ENABLED", False)
 
     @property
+    def ai_reviews_enabled(self) -> bool:
+        return env_bool("ASTRA_AI_REVIEWS_ENABLED", False)
+
+    @property
     def ai_brain_provider(self) -> str:
         return os.getenv("ASTRA_AI_BRAIN_PROVIDER", "gemini").strip().lower() or "gemini"
 
@@ -144,6 +148,7 @@ class AppConfig:
             "ai_brain": {
                 "enabled": self.ai_brain_enabled,
                 "exports_enabled": self.ai_exports_enabled,
+                "reviews_enabled": self.ai_reviews_enabled,
                 "provider": self.ai_brain_provider,
                 "require_video": env_bool("ASTRA_AI_REQUIRE_VIDEO", True),
                 "require_audio_or_transcript": env_bool("ASTRA_AI_REQUIRE_AUDIO_OR_TRANSCRIPT", True),
