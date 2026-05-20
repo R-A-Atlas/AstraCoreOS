@@ -158,6 +158,8 @@ class AppConfig:
                 "gemini_files_upload_url": os.getenv("GEMINI_FILES_UPLOAD_URL", "https://generativelanguage.googleapis.com/upload/v1beta/files"),
                 "gemini_multimodal_model": os.getenv("GEMINI_MODEL_MULTIMODAL", "gemini-2.5-flash"),
                 "gemini_multimodal_reasoning_model": os.getenv("GEMINI_MODEL_MULTIMODAL_REASONING", "gemini-2.5-pro"),
+                "gemini_file_active_timeout_seconds": env_int("GEMINI_FILE_ACTIVE_TIMEOUT_SECONDS", 900),
+                "gemini_file_poll_seconds": env_int("GEMINI_FILE_POLL_SECONDS", 5),
             },
             "providers": [provider.to_dict() for provider in providers],
         }

@@ -4,7 +4,11 @@ __pycache__/
 .env
 workspace/outputs/*.docx
 workspace/outputs/*.pine
+workspace/outputs/*.html
+workspace/outputs/*.mq5
 workspace/memory/*.jsonl
 workspace/integrations/*.jsonl
 workspace/captures/*.webm
+workspace/captures/*.txt
+workspace/captures/*.json
 workspace/captures/*.jsonl

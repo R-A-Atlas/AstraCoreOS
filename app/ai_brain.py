@@ -9,7 +9,7 @@ import re
 import time
 from typing import Any
 
-from app.config import env_bool, load_env_file
+from app.config import env_bool, env_int, load_env_file
 from app.model_clients import ModelClientError
 from app.pine_generator import PineStrategyGenerator, StrategyArtifact
 
@@ -50,7 +50,9 @@ class GeminiMultimodalClient:
         try:
             uploaded = client.files.upload(file=str(video_path))
             uploaded_name = getattr(uploaded, "name", "")
-            deadline = time.time() + 90
+            wait_seconds = max(30, env_int("GEMINI_FILE_ACTIVE_TIMEOUT_SECONDS", 900))
+            poll_seconds = max(1, env_int("GEMINI_FILE_POLL_SECONDS", 5))
+            deadline = time.time() + wait_seconds
             active = False
             while uploaded_name and time.time() < deadline:
                 current = client.files.get(name=uploaded_name)
@@ -61,9 +63,9 @@ class GeminiMultimodalClient:
                     break
                 if state == "FAILED":
                     raise ModelClientError("Gemini video processing failed.")
-                time.sleep(2)
+                time.sleep(poll_seconds)
             if uploaded_name and not active:
-                raise ModelClientError("Gemini video processing timed out before the file became active.")
+                raise ModelClientError(f"Gemini video processing timed out after {wait_seconds} seconds before the file became active.")
             response = client.models.generate_content(
                 model=self.model,
                 contents=[uploaded, prompt],
