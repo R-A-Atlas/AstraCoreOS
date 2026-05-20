@@ -52,6 +52,9 @@ const els = {
   generatePineBtn: document.querySelector("#generate-pine-btn"),
   exportBtns: document.querySelectorAll(".export-btn, #generate-pine-btn"),
   pineResult: document.querySelector("#pine-result"),
+  voiceRing: document.querySelector("#voice-ring"),
+  voiceRingLabel: document.querySelector("#voice-ring-label"),
+  voiceRingSubtitle: document.querySelector("#voice-ring-subtitle"),
 };
 
 const icons = {
@@ -71,6 +74,15 @@ function formatDuration(totalSeconds) {
   return `${minutes}:${seconds}`;
 }
 
+function setVoiceRing(mode = "idle", label = "Idle", subtitle = "AI coach standing by") {
+  if (!els.voiceRing) {
+    return;
+  }
+  els.voiceRing.dataset.state = mode;
+  els.voiceRingLabel.textContent = label;
+  els.voiceRingSubtitle.textContent = subtitle;
+}
+
 function setRecordingUi() {
   els.recordingPill.classList.toggle("hidden", !state.recording);
   els.previewFrame.classList.toggle("recording", state.recording && !state.paused);
@@ -83,12 +95,20 @@ function setRecordingUi() {
   els.previewStatus.textContent = state.recording ? (state.paused ? "Paused" : "Live") : "Preview";
   els.pauseSessionBtn.setAttribute("aria-label", state.paused ? "Resume recording" : "Pause recording");
   els.pauseIcon.innerHTML = state.paused ? icons.play : icons.pause;
+  if (state.recording && state.paused) {
+    setVoiceRing("idle", "Paused", "Capture paused");
+  } else if (state.recording) {
+    setVoiceRing("recording", state.micEnabled ? "Listening" : "Recording", state.micEnabled ? "Screen + voice active" : "Screen capture active");
+  } else {
+    setVoiceRing("idle", "Idle", state.micEnabled ? "AI coach standing by" : "Mic muted");
+  }
 }
 
 function setMicUi() {
   els.micBtn.classList.toggle("muted", !state.micEnabled);
   els.micIcon.innerHTML = state.micEnabled ? icons.mic : icons.micOff;
   updateTranscriptStatus();
+  setRecordingUi();
 }
 
 function setPreview(stream) {
@@ -104,6 +124,7 @@ function setPreview(stream) {
   els.resolutionHud.textContent = `${settings.width || 0}x${settings.height || 0} - ${Math.round(settings.frameRate || 0)}fps`;
   track.onended = stopSession;
   els.preview.play().catch(() => {});
+  setVoiceRing("complete", "Display ready", "Choose Start session");
 }
 
 async function requestDisplay() {
@@ -182,6 +203,7 @@ async function startSession() {
     setRecordingUi();
   } catch (error) {
     els.pineResult.textContent = error.message || "Could not start recording.";
+    setVoiceRing("error", "Start failed", error.message || "Could not start recording");
   }
 }
 
@@ -223,11 +245,13 @@ function stopSession() {
 }
 
 async function saveRecording() {
+  setVoiceRing("reviewing", "Saving", "Preparing capture memory");
   const blob = new Blob(state.chunks, { type: "video/webm" });
   const transcript = getTranscriptText();
   cleanupStreams();
   if (!blob.size) {
     els.pineResult.textContent = "Recording stopped, but no video data was captured.";
+    setVoiceRing("error", "No video", "Capture did not save");
     return;
   }
 
@@ -252,10 +276,12 @@ async function saveRecording() {
       ? `<br><a href="${data.capture.transcript_download_url}" download>Download transcript</a>`
       : "";
     els.pineResult.innerHTML = `Walkthrough saved: <a href="${data.capture.download_url}" download>${data.capture.filename}</a>${transcriptLink}<br>Open Capture Library to run AI exports from this video plus voice/transcript context.`;
+    setVoiceRing("complete", "Capture saved", "Open Library for AI review");
     await loadCaptures();
     openTray();
   } catch (error) {
     els.pineResult.textContent = error.message || "Could not save capture.";
+    setVoiceRing("error", "Save failed", error.message || "Could not save capture");
   }
 }
 
@@ -476,6 +502,7 @@ async function generateStrategyExport(exportType = "pine") {
   });
   const label = exportType === "mt5" ? "MT5/MQL5 Expert Advisor" : exportType === "instructions" ? "visual trade playbook" : "Pine Script";
   els.pineResult.textContent = `Building Local Template ${label} from ${notes ? "typed notes" : "latest chart walkthrough transcript"}...`;
+  setVoiceRing("exporting", "Exporting", `Building ${label}`);
   try {
     const response = await fetch("/api/strategies/export", {
       method: "POST",
@@ -493,8 +520,10 @@ async function generateStrategyExport(exportType = "pine") {
       Source: ${escapeHtml(data.strategy.source)}<br>
       <a href="${data.strategy.download_url}" download>Download ${escapeHtml(data.strategy.filename)}</a>
     `;
+    setVoiceRing("complete", "Export ready", label);
   } catch (error) {
     els.pineResult.textContent = error.message || "Could not generate export.";
+    setVoiceRing("error", "Export failed", error.message || "Could not generate export");
   } finally {
     els.exportBtns.forEach((button) => {
       button.disabled = false;
@@ -574,5 +603,6 @@ window.setInterval(setClock, 1000);
 renderMonitorStrip();
 setMicUi();
 setRecordingUi();
+setVoiceRing("idle", "Idle", "AI coach standing by");
 wireEvents();
 loadCaptures();

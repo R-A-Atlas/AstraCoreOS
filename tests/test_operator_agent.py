@@ -629,6 +629,8 @@ def test_studio_route_serves_focused_capture_ui():
     assert "Connect a chart display" in response.text
     assert "Walkthrough guide" in response.text
     assert "range high, range low" in response.text
+    assert 'href="/"' in response.text
+    assert "AI coach standing by" in response.text
     assert "/static/studio.js" in response.text
 
 
@@ -660,8 +662,9 @@ def test_library_route_serves_capture_library():
     assert "/static/library.js" in response.text
     assert "Run AI Review" in response.text
     assert "Pattern insight" in response.text
+    assert 'href="/"' in response.text
     assert 'href="/studio"' in response.text
-    assert 'href="/">' not in response.text
+    assert "AI coach standing by" in response.text
 
 
 def test_studio_recent_tray_links_to_library():

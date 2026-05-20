@@ -9,13 +9,31 @@
 <body>
   <main class="studio-shell">
     <header class="studio-topbar">
-      <a class="brand" href="/studio" aria-label="AstraCore Studio home">
+      <a class="brand" href="/" aria-label="AstraCore landing page">
         <span class="brand-mark"></span>
         <span>AstraCore</span>
         <span class="brand-muted">Studio</span>
       </a>
 
       <nav class="top-actions" aria-label="Studio controls">
+        <a class="toolbar-btn top-link" href="/">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+          Landing
+        </a>
+        <a class="toolbar-btn top-link" href="/library">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg>
+          Library
+        </a>
+        <div id="voice-ring" class="assistant-orb" data-state="idle" aria-live="polite">
+          <div class="orb-visual" aria-hidden="true">
+            <span class="orb-halo"></span>
+            <span class="orb-core"></span>
+          </div>
+          <div class="orb-copy">
+            <strong id="voice-ring-label">Idle</strong>
+            <span id="voice-ring-subtitle">AI coach standing by</span>
+          </div>
+        </div>
         <span id="recording-pill" class="pill recording-pill hidden">
           <span class="rec-dot"></span>
           Recording

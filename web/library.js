@@ -35,7 +35,19 @@ const els = {
   reviewStatus: document.querySelector("#review-status"),
   reviewOutput: document.querySelector("#review-output"),
   memoryInsight: document.querySelector("#memory-insight"),
+  voiceRing: document.querySelector("#voice-ring"),
+  voiceRingLabel: document.querySelector("#voice-ring-label"),
+  voiceRingSubtitle: document.querySelector("#voice-ring-subtitle"),
 };
+
+function setVoiceRing(mode = "idle", label = "Idle", subtitle = "AI coach standing by") {
+  if (!els.voiceRing) {
+    return;
+  }
+  els.voiceRing.dataset.state = mode;
+  els.voiceRingLabel.textContent = label;
+  els.voiceRingSubtitle.textContent = subtitle;
+}
 
 async function loadConfigStatus() {
   try {
@@ -50,6 +62,11 @@ async function loadConfigStatus() {
     state.aiBrain.exportsEnabled = false;
     state.aiBrain.reviewsEnabled = false;
   }
+  setVoiceRing(
+    state.aiBrain.enabled ? "idle" : "error",
+    state.aiBrain.enabled ? "Idle" : "AI disabled",
+    state.aiBrain.enabled ? "Select a capture" : "Enable AI flags in .env",
+  );
   renderExportLabels();
 }
 
@@ -131,6 +148,11 @@ async function selectCapture(captureId) {
   els.setupType.textContent = capture.setup_type || "unset";
   els.tradeGrade.textContent = capture.trade_grade || "unset";
   els.displayName.value = capture.display_name || capture.filename;
+  setVoiceRing(
+    capture.has_ai_review ? "complete" : "idle",
+    capture.has_ai_review ? "Review saved" : "Capture selected",
+    capture.ready_for_ai ? "Ready for AI coach" : "Needs video + voice context",
+  );
   renderTranscript(capture);
   renderGeneratedExports(capture);
   renderAiReadiness(capture);
@@ -145,6 +167,7 @@ function clearDetail() {
   els.detail.classList.add("hidden");
   els.video.removeAttribute("src");
   els.video.load();
+  setVoiceRing("idle", "Idle", "Select a capture");
   renderList();
 }
 
@@ -305,6 +328,7 @@ async function saveName() {
     return;
   }
   els.saveName.disabled = true;
+  setVoiceRing("reviewing", "Saving", "Updating capture name");
   try {
     const response = await fetch(`/api/captures/${state.selected.id}`, {
       method: "PATCH",
@@ -317,8 +341,10 @@ async function saveName() {
     const data = await response.json();
     state.captures = state.captures.map((capture) => capture.id === data.capture.id ? data.capture : capture);
     selectCapture(data.capture.id);
+    setVoiceRing("complete", "Saved", "Capture name updated");
   } catch (error) {
     els.exportResult.textContent = error.message || "Could not rename capture.";
+    setVoiceRing("error", "Save failed", error.message || "Could not rename capture");
   } finally {
     els.saveName.disabled = false;
   }
@@ -333,6 +359,7 @@ async function deleteCapture() {
     return;
   }
   try {
+    setVoiceRing("reviewing", "Deleting", "Removing capture");
     const response = await fetch(`/api/captures/${state.selected.id}`, { method: "DELETE" });
     if (!response.ok) {
       throw new Error("Delete failed.");
@@ -341,9 +368,12 @@ async function deleteCapture() {
     clearDetail();
     if (state.captures.length) {
       selectCapture(state.captures[0].id);
+    } else {
+      setVoiceRing("idle", "Idle", "No captures saved");
     }
   } catch (error) {
     els.exportResult.textContent = error.message || "Could not delete capture.";
+    setVoiceRing("error", "Delete failed", error.message || "Could not delete capture");
   }
 }
 
@@ -358,6 +388,11 @@ async function exportSelected(exportType) {
   els.exportResult.textContent = exportMode === "ai"
     ? "Building AI export from selected video plus voice/transcript context..."
     : "Building Local Template export from selected capture transcript...";
+  setVoiceRing(
+    exportMode === "ai" ? "exporting" : "reviewing",
+    exportMode === "ai" ? "AI exporting" : "Local export",
+    exportMode === "ai" ? "Video + transcript in use" : "Transcript template in use",
+  );
   try {
     const response = await fetch(`/api/captures/${state.selected.id}/export`, {
       method: "POST",
@@ -382,8 +417,10 @@ async function exportSelected(exportType) {
     `;
     renderGeneratedExports(data.capture);
     renderList();
+    setVoiceRing("complete", "Export ready", data.strategy?.source || exportMode);
   } catch (error) {
     els.exportResult.textContent = error.message || "Could not generate export.";
+    setVoiceRing("error", "Export failed", error.message || "Could not generate export");
   } finally {
     els.exportBtns.forEach((button) => {
       button.disabled = false;
@@ -397,6 +434,7 @@ async function runAiReview() {
   }
   els.runReview.disabled = true;
   els.reviewStatus.textContent = "Running AI review from selected video plus voice/transcript context...";
+  setVoiceRing("reviewing", "Reviewing", "Watching capture + transcript");
   try {
     const response = await fetch(`/api/captures/${state.selected.id}/review`, { method: "POST" });
     const data = await response.json().catch(() => ({}));
@@ -413,8 +451,10 @@ async function runAiReview() {
     renderReview(data.review);
     renderMemoryInsight();
     renderList();
+    setVoiceRing("complete", "Review complete", "Trading memory updated");
   } catch (error) {
     els.reviewStatus.textContent = error.message || "Could not run AI review.";
+    setVoiceRing("error", "Review failed", error.message || "Could not run AI review");
   } finally {
     renderReviewReadiness(state.selected);
   }

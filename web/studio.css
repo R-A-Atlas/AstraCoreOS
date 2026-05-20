@@ -178,6 +178,10 @@ svg {
   padding: 0 0.75rem;
 }
 
+.top-link {
+  text-decoration: none;
+}
+
 .toolbar-btn:hover,
 .icon-btn:hover {
   background: rgba(255, 255, 255, 0.06);
@@ -190,6 +194,114 @@ svg {
   height: 2rem;
   display: inline-grid;
   place-items: center;
+}
+
+.assistant-orb {
+  --orb-a: var(--brand);
+  --orb-b: var(--brand-2);
+  --orb-glow: rgba(167, 139, 250, 0.46);
+  height: 2.35rem;
+  min-width: 11.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.62rem;
+  padding: 0.25rem 0.8rem 0.25rem 0.3rem;
+  border: 1px solid rgba(167, 139, 250, 0.24);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.08), transparent 2.4rem),
+    rgba(255, 255, 255, 0.045);
+  box-shadow: 0 0 1.8rem -0.9rem var(--orb-glow);
+  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.orb-visual {
+  width: 1.82rem;
+  height: 1.82rem;
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+}
+
+.orb-halo,
+.orb-core {
+  position: absolute;
+  border-radius: 50%;
+}
+
+.orb-halo {
+  inset: -0.16rem;
+  border: 1px solid color-mix(in srgb, var(--orb-a), transparent 18%);
+  box-shadow: 0 0 1.1rem var(--orb-glow);
+  opacity: 0.82;
+}
+
+.orb-core {
+  inset: 0.18rem;
+  background:
+    radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.9), transparent 0.34rem),
+    radial-gradient(circle at 72% 72%, var(--orb-b), transparent 0.88rem),
+    linear-gradient(135deg, var(--orb-a), #2d1b79 55%, #090a10);
+  box-shadow:
+    inset 0 0 1rem rgba(255, 255, 255, 0.12),
+    0 0 1rem var(--orb-glow);
+}
+
+.orb-copy {
+  display: grid;
+  min-width: 0;
+  gap: 0.05rem;
+}
+
+.orb-copy strong,
+.orb-copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.orb-copy strong {
+  color: var(--text);
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.orb-copy span {
+  color: var(--text-muted);
+  font-size: 0.66rem;
+}
+
+.assistant-orb[data-state="listening"] .orb-halo,
+.assistant-orb[data-state="recording"] .orb-halo {
+  animation: orbPulse 1.1s ease-in-out infinite;
+}
+
+.assistant-orb[data-state="recording"] {
+  --orb-a: var(--record);
+  --orb-b: var(--brand);
+  --orb-glow: rgba(255, 79, 88, 0.55);
+  border-color: rgba(255, 79, 88, 0.35);
+}
+
+.assistant-orb[data-state="reviewing"] .orb-halo,
+.assistant-orb[data-state="exporting"] .orb-halo {
+  animation: orbSpin 1.25s linear infinite;
+  border-style: dashed;
+}
+
+.assistant-orb[data-state="complete"] {
+  --orb-a: var(--good);
+  --orb-b: var(--brand);
+  --orb-glow: rgba(69, 242, 138, 0.44);
+  border-color: rgba(69, 242, 138, 0.32);
+}
+
+.assistant-orb[data-state="error"] {
+  --orb-a: var(--record);
+  --orb-b: #ff9aa1;
+  --orb-glow: rgba(255, 79, 88, 0.5);
+  border-color: rgba(255, 79, 88, 0.44);
 }
 
 .studio-stage {
@@ -861,6 +973,24 @@ textarea:focus {
   }
 }
 
+@keyframes orbPulse {
+  0%,
+  100% {
+    opacity: 0.78;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.28;
+    transform: scale(1.42);
+  }
+}
+
+@keyframes orbSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (max-width: 1020px) {
   .studio-stage {
     grid-template-columns: 1fr;
@@ -913,6 +1043,19 @@ textarea:focus {
 
   .ready-pill,
   .clock {
+    display: none;
+  }
+
+  .top-link {
+    display: none;
+  }
+
+  .assistant-orb {
+    min-width: 2.35rem;
+    padding-right: 0.25rem;
+  }
+
+  .orb-copy {
     display: none;
   }
 

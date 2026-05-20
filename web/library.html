@@ -10,17 +10,31 @@
 <body>
   <main class="library-shell">
     <header class="studio-topbar">
-      <a class="brand" href="/studio" aria-label="Back to studio">
+      <a class="brand" href="/" aria-label="AstraCore landing page">
         <span class="brand-mark"></span>
         <span>AstraCore</span>
         <span class="brand-muted">Capture Library</span>
       </a>
 
       <nav class="top-actions" aria-label="Library controls">
+        <a class="toolbar-btn library-top-link" href="/">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+          Landing
+        </a>
         <a class="toolbar-btn library-top-link" href="/studio">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
           Studio
         </a>
+        <div id="voice-ring" class="assistant-orb" data-state="idle" aria-live="polite">
+          <div class="orb-visual" aria-hidden="true">
+            <span class="orb-halo"></span>
+            <span class="orb-core"></span>
+          </div>
+          <div class="orb-copy">
+            <strong id="voice-ring-label">Idle</strong>
+            <span id="voice-ring-subtitle">AI coach standing by</span>
+          </div>
+        </div>
       </nav>
     </header>
 
