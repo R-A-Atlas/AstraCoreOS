@@ -101,7 +101,7 @@ function setPreview(stream) {
   const track = stream.getVideoTracks()[0];
   const settings = track.getSettings();
   els.sourceLabel.textContent = track.label || "Screen";
-  els.resolutionHud.textContent = `${settings.width || 0}x${settings.height || 0} · ${Math.round(settings.frameRate || 0)}fps`;
+  els.resolutionHud.textContent = `${settings.width || 0}x${settings.height || 0} - ${Math.round(settings.frameRate || 0)}fps`;
   track.onended = stopSession;
   els.preview.play().catch(() => {});
 }
@@ -235,6 +235,7 @@ async function saveRecording() {
   const filename = `strategy-walkthrough-${stamp}.webm`;
   try {
     const params = new URLSearchParams({ filename });
+    params.set("mic_enabled", String(state.micEnabled));
     if (transcript) {
       params.set("transcript", transcript);
     }
@@ -250,7 +251,7 @@ async function saveRecording() {
     const transcriptLink = data.capture.transcript_download_url
       ? `<br><a href="${data.capture.transcript_download_url}" download>Download transcript</a>`
       : "";
-    els.pineResult.innerHTML = `Walkthrough saved: <a href="${data.capture.download_url}" download>${data.capture.filename}</a>${transcriptLink}<br>Choose Pine Script, MT5/MQL5, or Visual Playbook. The latest transcript will be used automatically.`;
+    els.pineResult.innerHTML = `Walkthrough saved: <a href="${data.capture.download_url}" download>${data.capture.filename}</a>${transcriptLink}<br>Open Capture Library to run AI exports from this video plus voice/transcript context.`;
     await loadCaptures();
     openTray();
   } catch (error) {
@@ -446,7 +447,7 @@ async function loadCaptures() {
         <span class="capture-thumb"></span>
         <span>
           <span class="capture-name">${escapeHtml(capture.display_name || capture.filename)}</span>
-          <span class="capture-meta">${formatBytes(capture.size_bytes)} · ${new Date(capture.created_at).toLocaleString()}</span>
+          <span class="capture-meta">${formatBytes(capture.size_bytes)} - ${new Date(capture.created_at).toLocaleString()}</span>
         </span>
       </a>
       ${transcriptLink}
@@ -474,7 +475,7 @@ async function generateStrategyExport(exportType = "pine") {
     button.disabled = true;
   });
   const label = exportType === "mt5" ? "MT5/MQL5 Expert Advisor" : exportType === "instructions" ? "visual trade playbook" : "Pine Script";
-  els.pineResult.textContent = `Building ${label} from ${notes ? "typed notes" : "latest chart walkthrough transcript"}...`;
+  els.pineResult.textContent = `Building Local Template ${label} from ${notes ? "typed notes" : "latest chart walkthrough transcript"}...`;
   try {
     const response = await fetch("/api/strategies/export", {
       method: "POST",

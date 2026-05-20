@@ -95,11 +95,15 @@
                 </div>
               </div>
               <div class="export-grid">
-                <button class="primary-btn wide library-export-btn" type="button" data-export-type="pine">Pine Script</button>
-                <button class="secondary-btn wide library-export-btn" type="button" data-export-type="mt5">MT5 / MQL5</button>
-                <button class="secondary-btn wide library-export-btn" type="button" data-export-type="instructions">Visual Playbook</button>
+                <button class="primary-btn wide library-export-btn" type="button" data-export-type="pine">AI Pine Export</button>
+                <button class="secondary-btn wide library-export-btn" type="button" data-export-type="mt5">AI MT5 / MQL5</button>
+                <button class="secondary-btn wide library-export-btn" type="button" data-export-type="instructions">AI Visual Playbook</button>
               </div>
-              <div id="library-export-result" class="result-box">Select an export to regenerate it from this capture transcript.</div>
+              <label class="local-template-toggle" for="local-template-mode">
+                <input id="local-template-mode" type="checkbox" />
+                Use Local Template instead of AI Brain
+              </label>
+              <div id="library-export-result" class="result-box">Select an AI export to analyze this capture video plus voice/transcript context.</div>
               <div id="generated-exports" class="generated-exports"></div>
             </article>
           </section>
@@ -107,10 +111,10 @@
           <article class="library-card ai-placeholder">
             <div>
               <p>Next layer</p>
-              <h3>AI trade review</h3>
+              <h3>Timestamped AI trade review</h3>
             </div>
-            <span>Coming next: video-frame review, timestamped critiques, setup tagging, and trader behavior memory.</span>
-            <button class="secondary-btn" type="button" disabled>AI Review not wired yet</button>
+            <span>Next layer after exports: critiques with exact timestamps, repeated setup tagging, and trader behavior memory.</span>
+            <button class="secondary-btn" type="button" disabled>AI Review next</button>
           </article>
         </div>
       </section>

@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.backend import app
+from app.ai_brain import MultimodalAIBrain
 from app.capture_studio import CaptureStudio
 from app.command_center import default_command_center_state
 from app.config import AppConfig
@@ -132,6 +133,37 @@ def test_config_status_does_not_expose_secret_values(tmp_path: Path):
     assert status["providers"][0]["configured"] is True
     assert "real-secret" not in str(status)
     assert status["supabase_configured"] is True
+
+
+def test_ai_brain_config_defaults_are_safe_and_keyless(tmp_path: Path, monkeypatch):
+    for key in [
+        "ASTRA_AI_BRAIN_ENABLED",
+        "ASTRA_AI_EXPORTS_ENABLED",
+        "ASTRA_AI_BRAIN_PROVIDER",
+        "ASTRA_AI_REQUIRE_VIDEO",
+        "ASTRA_AI_REQUIRE_AUDIO_OR_TRANSCRIPT",
+        "ASTRA_AI_FALLBACK_TO_LOCAL",
+        "GEMINI_API_KEY",
+        "GEMINI_API_BASE_URL",
+        "GEMINI_FILES_UPLOAD_URL",
+        "GEMINI_MODEL_MULTIMODAL",
+        "GEMINI_MODEL_MULTIMODAL_REASONING",
+    ]:
+        monkeypatch.delenv(key, raising=False)
+
+    status = AppConfig(tmp_path).safe_status()
+
+    assert status["ai_brain"]["enabled"] is False
+    assert status["ai_brain"]["exports_enabled"] is False
+    assert status["ai_brain"]["provider"] == "gemini"
+    assert status["ai_brain"]["require_video"] is True
+    assert status["ai_brain"]["require_audio_or_transcript"] is True
+    assert status["ai_brain"]["fallback_to_local"] is False
+    assert status["ai_brain"]["gemini_configured"] is False
+    assert status["ai_brain"]["gemini_api_base_url"] == "https://generativelanguage.googleapis.com"
+    assert status["ai_brain"]["gemini_files_upload_url"] == "https://generativelanguage.googleapis.com/upload/v1beta/files"
+    assert status["ai_brain"]["gemini_multimodal_model"] == "gemini-2.5-flash"
+    assert status["ai_brain"]["gemini_multimodal_reasoning_model"] == "gemini-2.5-pro"
 
 
 def test_paid_models_stay_local_when_disabled(tmp_path: Path, monkeypatch):
@@ -275,6 +307,9 @@ def test_capture_studio_saves_webm_capture(tmp_path: Path):
     assert Path(session.path).exists()
     assert recent[-1].id == session.id
     assert recent[-1].transcript_status == "pending"
+    assert session.mic_enabled is False
+    assert session.has_transcript is False
+    assert session.ready_for_ai is False
 
 
 def test_capture_studio_saves_transcript_sidecar(tmp_path: Path):
@@ -290,8 +325,20 @@ def test_capture_studio_saves_transcript_sidecar(tmp_path: Path):
     assert session.transcript_status == "complete"
     assert session.transcript_filename.endswith(".txt")
     assert transcript_path.exists()
+    assert session.has_transcript is True
+    assert session.ready_for_ai is True
     assert "reclaiming the prior candle high" in transcript_path.read_text(encoding="utf-8")
     assert "reclaiming the prior candle high" in studio.latest_transcript()
+
+
+def test_capture_studio_marks_mic_recordings_ready_for_ai(tmp_path: Path):
+    studio = CaptureStudio(tmp_path)
+
+    session = studio.save_capture(b"fake-webm-data", "mic-review.webm", mic_enabled=True)
+
+    assert session.mic_enabled is True
+    assert session.has_transcript is False
+    assert session.ready_for_ai is True
 
 
 def test_capture_studio_loads_old_records_with_metadata_defaults(tmp_path: Path):
@@ -342,6 +389,7 @@ def test_capture_studio_records_export_history(tmp_path: Path):
     assert updated.last_exported_at
     assert updated.generated_exports[-1]["filename"] == artifact.filename
     assert updated.generated_exports[-1]["type"] == "instructions"
+    assert updated.generated_exports[-1]["source"] == "local_template"
 
 
 def test_pine_generator_creates_clean_strategy_file(tmp_path: Path):
@@ -378,6 +426,101 @@ def test_strategy_generator_creates_mt5_and_instruction_exports(tmp_path: Path):
     assert "Execution Checklist" in instructions_content
     assert "AstraCore Trade Playbook" in instructions_content
     assert "reclaiming prior candle high" in instructions_content
+
+
+def test_multimodal_ai_brain_uses_video_and_creates_artifact(tmp_path: Path, monkeypatch):
+    class FakeGeminiClient:
+        model = "gemini-test"
+
+        @property
+        def configured(self) -> bool:
+            return True
+
+        def generate_from_video(self, video_path: Path, prompt: str) -> str:
+            assert video_path.exists()
+            assert "attached chart walkthrough video" in prompt
+            assert "Do not create rules from transcript alone" in prompt
+            return (
+                '{"title":"AI NQ Reclaim","summary":"Generated from video plus narration.",'
+                '"exports":{"pine":"//@version=6\\nstrategy(\\"AI NQ Reclaim\\", overlay=true)\\n"}}'
+            )
+
+    monkeypatch.setenv("ASTRA_AI_BRAIN_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_AI_EXPORTS_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_AI_BRAIN_PROVIDER", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
+    studio = CaptureStudio(tmp_path)
+    session = studio.save_capture(
+        b"fake-webm-data",
+        "nq-review.webm",
+        "I would enter after reclaiming the range high.",
+        mic_enabled=True,
+    )
+    generator = PineStrategyGenerator(tmp_path)
+    brain = MultimodalAIBrain(tmp_path, generator, client=FakeGeminiClient())
+
+    result = brain.generate_export(session, studio.transcript_for(session.id), "AI NQ Reclaim", "pine")
+    content = Path(result.artifact.path).read_text(encoding="utf-8")
+
+    assert result.source == "ai_multimodal"
+    assert result.model == "gemini-test"
+    assert result.artifact.filename.endswith(".pine")
+    assert "//@version=6" in content
+
+
+def test_multimodal_ai_brain_rejects_missing_video(tmp_path: Path, monkeypatch):
+    class FakeGeminiClient:
+        model = "gemini-test"
+
+        @property
+        def configured(self) -> bool:
+            return True
+
+        def generate_from_video(self, video_path: Path, prompt: str) -> str:
+            raise AssertionError("AI client should not be called without video.")
+
+    monkeypatch.setenv("ASTRA_AI_BRAIN_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_AI_EXPORTS_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_AI_BRAIN_PROVIDER", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
+    studio = CaptureStudio(tmp_path)
+    session = studio.save_capture(b"fake-webm-data", "nq-review.webm", "Transcript only.", mic_enabled=True)
+    Path(session.path).unlink()
+    brain = MultimodalAIBrain(tmp_path, PineStrategyGenerator(tmp_path), client=FakeGeminiClient())
+
+    try:
+        brain.generate_export(session, studio.transcript_for(session.id), "Bad Export", "pine")
+    except RuntimeError as exc:
+        assert "video file is missing" in str(exc).lower()
+    else:
+        raise AssertionError("Expected missing video to block AI export.")
+
+
+def test_multimodal_ai_brain_rejects_video_without_audio_or_transcript(tmp_path: Path, monkeypatch):
+    class FakeGeminiClient:
+        model = "gemini-test"
+
+        @property
+        def configured(self) -> bool:
+            return True
+
+        def generate_from_video(self, video_path: Path, prompt: str) -> str:
+            raise AssertionError("AI client should not be called without audio or transcript context.")
+
+    monkeypatch.setenv("ASTRA_AI_BRAIN_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_AI_EXPORTS_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_AI_BRAIN_PROVIDER", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
+    studio = CaptureStudio(tmp_path)
+    session = studio.save_capture(b"fake-webm-data", "silent.webm")
+    brain = MultimodalAIBrain(tmp_path, PineStrategyGenerator(tmp_path), client=FakeGeminiClient())
+
+    try:
+        brain.generate_export(session, "", "Silent Export", "pine")
+    except RuntimeError as exc:
+        assert "mic audio or a transcript" in str(exc)
+    else:
+        raise AssertionError("Expected missing audio/transcript context to block AI export.")
 
 
 def test_strategy_export_uses_latest_capture_transcript_when_notes_empty(tmp_path: Path):
@@ -475,19 +618,178 @@ def test_capture_api_limit_rename_delete_and_selected_export(tmp_path: Path, mon
 
     exported = client.post(
         f"/api/captures/{second.id}/export",
-        json={"name": "NQ reclaim review", "export_type": "instructions"},
+        json={"name": "NQ reclaim review", "export_type": "instructions", "export_mode": "local"},
     )
     export_payload = exported.json()
 
     assert exported.status_code == 200
-    assert export_payload["strategy"]["source"] == "selected_capture_transcript"
+    assert export_payload["strategy"]["source"] == "local_template"
     assert export_payload["strategy"]["download_url"].endswith(".html")
     assert export_payload["capture"]["generated_exports"][-1]["type"] == "instructions"
+    assert export_payload["capture"]["generated_exports"][-1]["source"] == "local_template"
 
     deleted = client.delete(f"/api/captures/{second.id}")
 
     assert deleted.status_code == 200
     assert test_studio.get_capture(second.id) is None
+
+
+def test_capture_ai_export_disabled_fails_cleanly(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("ASTRA_AI_BRAIN_ENABLED", "false")
+    monkeypatch.setenv("ASTRA_AI_EXPORTS_ENABLED", "false")
+    test_studio = CaptureStudio(tmp_path)
+    test_generator = PineStrategyGenerator(tmp_path)
+    monkeypatch.setattr("app.backend.capture_studio", test_studio)
+    monkeypatch.setattr("app.backend.ai_brain", MultimodalAIBrain(tmp_path, test_generator))
+    client = TestClient(app)
+    session = test_studio.save_capture(
+        b"fake-webm-data",
+        "review.webm",
+        "Long after reclaim.",
+        mic_enabled=True,
+    )
+
+    response = client.post(
+        f"/api/captures/{session.id}/export",
+        json={"name": "AI disabled", "export_type": "pine", "export_mode": "ai"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "AI Brain disabled."
+
+
+def test_capture_ai_export_missing_gemini_key_fails_cleanly(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("ASTRA_AI_BRAIN_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_AI_EXPORTS_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_AI_BRAIN_PROVIDER", "gemini")
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    test_studio = CaptureStudio(tmp_path)
+    test_generator = PineStrategyGenerator(tmp_path)
+    monkeypatch.setattr("app.backend.capture_studio", test_studio)
+    monkeypatch.setattr("app.backend.ai_brain", MultimodalAIBrain(tmp_path, test_generator))
+    client = TestClient(app)
+    session = test_studio.save_capture(
+        b"fake-webm-data",
+        "review.webm",
+        "Long after reclaim.",
+        mic_enabled=True,
+    )
+
+    response = client.post(
+        f"/api/captures/{session.id}/export",
+        json={"name": "Missing key", "export_type": "pine", "export_mode": "ai"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Gemini API key missing."
+
+
+def test_capture_ai_export_uses_selected_capture_video_and_records_source(tmp_path: Path, monkeypatch):
+    class FakeGeminiClient:
+        model = "gemini-test"
+
+        @property
+        def configured(self) -> bool:
+            return True
+
+        def generate_from_video(self, video_path: Path, prompt: str) -> str:
+            assert video_path.name.endswith(".webm")
+            assert "Selected transcript reclaiming high" in prompt
+            return (
+                '{"title":"Selected AI Strategy","summary":"Selected capture AI export.",'
+                '"exports":{"instructions":"<!doctype html><html><body>AI playbook</body></html>"}}'
+            )
+
+    monkeypatch.setenv("ASTRA_AI_BRAIN_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_AI_EXPORTS_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_AI_BRAIN_PROVIDER", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
+    test_studio = CaptureStudio(tmp_path)
+    test_generator = PineStrategyGenerator(tmp_path)
+    monkeypatch.setattr("app.backend.capture_studio", test_studio)
+    monkeypatch.setattr("app.backend.ai_brain", MultimodalAIBrain(tmp_path, test_generator, client=FakeGeminiClient()))
+    client = TestClient(app)
+    session = test_studio.save_capture(
+        b"fake-webm-data",
+        "selected.webm",
+        "Selected transcript reclaiming high.",
+        mic_enabled=True,
+    )
+
+    response = client.post(
+        f"/api/captures/{session.id}/export",
+        json={"name": "Selected AI Strategy", "export_type": "instructions", "export_mode": "ai"},
+    )
+    payload = response.json()
+
+    assert response.status_code == 200
+    assert payload["strategy"]["source"] == "ai_multimodal"
+    assert payload["strategy"]["model"] == "gemini-test"
+    assert payload["strategy"]["download_url"].endswith(".html")
+    assert payload["capture"]["generated_exports"][-1]["source"] == "ai_multimodal"
+
+
+def test_capture_ai_export_rejects_transcript_without_video(tmp_path: Path, monkeypatch):
+    class FakeGeminiClient:
+        model = "gemini-test"
+
+        @property
+        def configured(self) -> bool:
+            return True
+
+        def generate_from_video(self, video_path: Path, prompt: str) -> str:
+            raise AssertionError("Transcript-only AI export should never call the model.")
+
+    monkeypatch.setenv("ASTRA_AI_BRAIN_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_AI_EXPORTS_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_AI_BRAIN_PROVIDER", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
+    test_studio = CaptureStudio(tmp_path)
+    test_generator = PineStrategyGenerator(tmp_path)
+    monkeypatch.setattr("app.backend.capture_studio", test_studio)
+    monkeypatch.setattr("app.backend.ai_brain", MultimodalAIBrain(tmp_path, test_generator, client=FakeGeminiClient()))
+    client = TestClient(app)
+    session = test_studio.save_capture(b"fake-webm-data", "missing.webm", "Transcript exists.", mic_enabled=True)
+    Path(session.path).unlink()
+
+    response = client.post(
+        f"/api/captures/{session.id}/export",
+        json={"name": "No video", "export_type": "pine", "export_mode": "ai"},
+    )
+
+    assert response.status_code == 400
+    assert "video file is missing" in response.json()["detail"].lower()
+
+
+def test_capture_ai_export_rejects_video_without_audio_or_transcript(tmp_path: Path, monkeypatch):
+    class FakeGeminiClient:
+        model = "gemini-test"
+
+        @property
+        def configured(self) -> bool:
+            return True
+
+        def generate_from_video(self, video_path: Path, prompt: str) -> str:
+            raise AssertionError("AI export should require audio or transcript context first.")
+
+    monkeypatch.setenv("ASTRA_AI_BRAIN_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_AI_EXPORTS_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_AI_BRAIN_PROVIDER", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
+    test_studio = CaptureStudio(tmp_path)
+    test_generator = PineStrategyGenerator(tmp_path)
+    monkeypatch.setattr("app.backend.capture_studio", test_studio)
+    monkeypatch.setattr("app.backend.ai_brain", MultimodalAIBrain(tmp_path, test_generator, client=FakeGeminiClient()))
+    client = TestClient(app)
+    session = test_studio.save_capture(b"fake-webm-data", "silent.webm")
+
+    response = client.post(
+        f"/api/captures/{session.id}/export",
+        json={"name": "Silent", "export_type": "pine", "export_mode": "ai"},
+    )
+
+    assert response.status_code == 400
+    assert "mic audio or a transcript" in response.json()["detail"]
 
 
 def test_capture_export_fails_without_transcript(tmp_path: Path, monkeypatch):
@@ -498,7 +800,7 @@ def test_capture_export_fails_without_transcript(tmp_path: Path, monkeypatch):
 
     response = client.post(
         f"/api/captures/{session.id}/export",
-        json={"name": "Silent capture", "export_type": "pine"},
+        json={"name": "Silent capture", "export_type": "pine", "export_mode": "local"},
     )
 
     assert response.status_code == 400

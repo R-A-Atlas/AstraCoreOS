@@ -28,6 +28,9 @@ class CaptureSession:
     mistake_markers: list[dict] = field(default_factory=list)
     setup_type: str = ""
     trade_grade: str = ""
+    mic_enabled: bool = False
+    has_transcript: bool = False
+    ready_for_ai: bool = False
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -38,7 +41,7 @@ class CaptureStudio:
         self.capture_dir = root / "workspace" / "captures"
         self.index_path = self.capture_dir / "capture_sessions.jsonl"
 
-    def save_capture(self, raw: bytes, filename: str | None = None, transcript: str = "") -> CaptureSession:
+    def save_capture(self, raw: bytes, filename: str | None = None, transcript: str = "", mic_enabled: bool = False) -> CaptureSession:
         if not raw:
             raise ValueError("Capture file is empty.")
         self.capture_dir.mkdir(parents=True, exist_ok=True)
@@ -64,6 +67,9 @@ class CaptureStudio:
             transcript_filename=transcript_filename,
             transcript_path=transcript_path,
             display_name=Path(safe_name).stem,
+            mic_enabled=bool(mic_enabled),
+            has_transcript=bool(transcript),
+            ready_for_ai=path.exists() and (bool(mic_enabled) or bool(transcript)),
         )
         self._append_session(session)
         return session
@@ -150,7 +156,7 @@ class CaptureStudio:
             return path.read_text(encoding="utf-8").strip()
         return ""
 
-    def record_export(self, capture_id: str, export_type: str, artifact: object) -> CaptureSession:
+    def record_export(self, capture_id: str, export_type: str, artifact: object, source: str = "local_template") -> CaptureSession:
         sessions = self.all_captures()
         target: CaptureSession | None = None
         created_at = datetime.now(timezone.utc).isoformat()
@@ -162,6 +168,7 @@ class CaptureStudio:
                     "type": export_type,
                     "filename": getattr(artifact, "filename", ""),
                     "title": getattr(artifact, "title", ""),
+                    "source": source,
                     "created_at": created_at,
                 }
             )
@@ -209,6 +216,10 @@ class CaptureStudio:
         payload.setdefault("mistake_markers", [])
         payload.setdefault("setup_type", "")
         payload.setdefault("trade_grade", "")
+        payload.setdefault("mic_enabled", False)
+        payload.setdefault("has_transcript", bool(payload.get("transcript_path")))
+        video_path = Path(payload.get("path", ""))
+        payload.setdefault("ready_for_ai", video_path.exists() and video_path.is_file() and (bool(payload.get("mic_enabled")) or bool(payload.get("has_transcript"))))
         return CaptureSession(**payload)
 
     def _delete_file(self, raw_path: str) -> None:

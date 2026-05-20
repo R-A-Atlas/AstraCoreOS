@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from app.ai_brain import AIBrainError, MultimodalAIBrain
 from app.command_center import default_command_center_state
 from app.config import AppConfig
 from app.capture_studio import CaptureStudio
@@ -32,6 +33,7 @@ intel_runner = IntelRunner()
 tradingview_bridge = TradingViewBridge(ROOT)
 capture_studio = CaptureStudio(ROOT)
 pine_generator = PineStrategyGenerator(ROOT)
+ai_brain = MultimodalAIBrain(ROOT, pine_generator)
 
 app.mount("/static", StaticFiles(directory=WEB), name="static")
 app.mount("/outputs", StaticFiles(directory=OUTPUTS), name="outputs")
@@ -63,6 +65,7 @@ class CaptureUpdateRequest(BaseModel):
 class CaptureExportRequest(BaseModel):
     name: str = Field("AstraCore Scalp Assist", max_length=100)
     export_type: str = Field("pine", max_length=20)
+    export_mode: str = Field("ai", max_length=20)
 
 
 @app.get("/")
@@ -188,10 +191,10 @@ def recent_memory(limit: int = 10) -> dict:
 
 
 @app.post("/api/captures")
-async def save_capture(request: Request, filename: str = "", transcript: str = "") -> dict:
+async def save_capture(request: Request, filename: str = "", transcript: str = "", mic_enabled: bool = False) -> dict:
     raw = await request.body()
     try:
-        session = capture_studio.save_capture(raw, filename, transcript)
+        session = capture_studio.save_capture(raw, filename, transcript, mic_enabled)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     transcript_download_url = (
@@ -267,15 +270,35 @@ def delete_capture(capture_id: str) -> dict:
 
 @app.post("/api/captures/{capture_id}/export")
 def export_capture(capture_id: str, req: CaptureExportRequest) -> dict:
+    session = capture_studio.get_capture(capture_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Capture not found.")
     try:
         notes = capture_studio.transcript_for(capture_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    if not notes:
-        raise HTTPException(status_code=400, detail="Selected capture has no transcript to export.")
-    artifact, export_type = _build_strategy_artifact(notes, req.name, req.export_type)
+
+    export_mode = req.export_mode.strip().lower() or "ai"
+    source = "local_template"
+    model = "local-template"
+    if export_mode == "local":
+        if not notes:
+            raise HTTPException(status_code=400, detail="Selected capture has no transcript for Local Template export.")
+        artifact, export_type = _build_strategy_artifact(notes, req.name, req.export_type)
+    elif export_mode == "ai":
+        try:
+            result = ai_brain.generate_export(session, notes, req.name, req.export_type)
+        except AIBrainError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        artifact = result.artifact
+        export_type = result.export_type
+        source = result.source
+        model = result.model
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported export mode.")
+
     try:
-        session = capture_studio.record_export(capture_id, export_type, artifact)
+        session = capture_studio.record_export(capture_id, export_type, artifact, source)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {
@@ -284,7 +307,8 @@ def export_capture(capture_id: str, req: CaptureExportRequest) -> dict:
         "strategy": {
             **artifact.to_dict(),
             "download_url": f"/outputs/{artifact.filename}",
-            "source": "selected_capture_transcript",
+            "source": source,
+            "model": model,
             "export_type": export_type,
         },
     }

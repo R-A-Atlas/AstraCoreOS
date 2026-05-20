@@ -130,8 +130,8 @@ Model routing and model clients:
 - `app/model_router.py`
 - `app/model_clients.py`
 - Cheap-first routing exists.
-- Gemini client exists.
-- Full AI trading brain is not implemented yet.
+- Gemini text client exists.
+- Gemini multimodal AI export brain exists behind explicit `.env` flags.
 
 General assistant leftovers from earlier direction:
 
@@ -154,14 +154,15 @@ Notifications status:
 
 ## AI / Model Reality
 
-The running AstraCore app is not currently connected to Codex or GPT-5.5 as its runtime AI brain.
+The running AstraCore app is not connected to this Codex chat session or GPT-5.5 as its runtime AI brain.
 
 What is true today:
 
 - Codex is being used to build the app.
 - The app itself is a local FastAPI/browser app.
-- The app currently generates strategy exports mostly through deterministic local backend templates using saved transcripts.
-- Gemini client support exists, but AI use is limited and not the full trading strategy brain.
+- Studio quick exports still use deterministic Local Template generation.
+- Capture Library exports can use a Gemini multimodal AI Brain when `ASTRA_AI_BRAIN_ENABLED=true`, `ASTRA_AI_EXPORTS_ENABLED=true`, and `GEMINI_API_KEY` is configured.
+- AI export requires selected video plus mic audio or transcript context. Transcript-only AI strategy generation is intentionally blocked.
 
 What is not true yet:
 
@@ -173,7 +174,8 @@ What is not true yet:
 
 Recommended future model setup:
 
-- Primary brain: OpenAI GPT-5.5 for hard reasoning, coding, strategy critique, and chart-frame analysis.
+- Current AI export brain: Gemini multimodal video upload with `gemini-2.5-flash` by default.
+- Possible later primary reviewer: OpenAI GPT-5.5 for hard reasoning, coding, strategy critique, and chart-frame analysis.
 - Low-cost background model: GPT-5.4-mini or Gemini Flash for summaries, tags, and metadata.
 - Optional reviewer: Claude Sonnet 4.6 for second-opinion critique and alternate strategy review.
 
@@ -326,8 +328,8 @@ These are not currently implemented:
 
 - GPT-5.5/OpenAI brain integration.
 - Claude Sonnet 4.6 reviewer integration.
-- AI video-frame extraction.
-- Chart image analysis.
+- Separate video-frame extraction pipeline.
+- Timestamped chart image analysis.
 - Timestamped AI trade critique.
 - Real strategy learning over multiple sessions.
 - Automatic setup classification from video.
@@ -343,16 +345,15 @@ These are not currently implemented:
 
 ## Next Recommended Build
 
-The next build should be the AI Brain layer.
+The next build should extend the AI Brain layer from export generation into trade review memory.
 
 Recommended sequence:
 
-1. Add an `AI Brain` backend service.
-2. Start with transcript-only AI review for a selected capture.
-3. Store the AI review result back into capture metadata.
-4. Add frame extraction from saved `.webm` files.
-5. Send selected frames plus transcript to the AI brain.
-6. Produce timestamped trade critique:
+1. Add timestamped AI review for a selected capture.
+2. Store the AI review result back into capture metadata.
+3. Add frame extraction from saved `.webm` files for timestamp references.
+4. Send selected frames plus transcript to the AI brain for critique.
+5. Produce timestamped trade critique:
    - what the trader saw
    - what rule was implied
    - what was valid

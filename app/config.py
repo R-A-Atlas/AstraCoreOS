@@ -76,6 +76,18 @@ class AppConfig:
     def max_paid_calls_per_day(self) -> int:
         return env_int("ASTRA_MAX_PAID_CALLS_PER_DAY", 0)
 
+    @property
+    def ai_brain_enabled(self) -> bool:
+        return env_bool("ASTRA_AI_BRAIN_ENABLED", False)
+
+    @property
+    def ai_exports_enabled(self) -> bool:
+        return env_bool("ASTRA_AI_EXPORTS_ENABLED", False)
+
+    @property
+    def ai_brain_provider(self) -> str:
+        return os.getenv("ASTRA_AI_BRAIN_PROVIDER", "gemini").strip().lower() or "gemini"
+
     def safe_status(self) -> dict[str, Any]:
         providers = [
             ProviderStatus(
@@ -129,5 +141,18 @@ class AppConfig:
                 (os.getenv("EMAIL_PROVIDER", "").strip().lower() == "gmail" and has_secret("GMAIL_CLIENT_ID") and has_secret("GMAIL_CLIENT_SECRET"))
                 or (os.getenv("EMAIL_PROVIDER", "").strip().lower() == "sendgrid" and has_secret("SENDGRID_API_KEY"))
             ),
+            "ai_brain": {
+                "enabled": self.ai_brain_enabled,
+                "exports_enabled": self.ai_exports_enabled,
+                "provider": self.ai_brain_provider,
+                "require_video": env_bool("ASTRA_AI_REQUIRE_VIDEO", True),
+                "require_audio_or_transcript": env_bool("ASTRA_AI_REQUIRE_AUDIO_OR_TRANSCRIPT", True),
+                "fallback_to_local": env_bool("ASTRA_AI_FALLBACK_TO_LOCAL", False),
+                "gemini_configured": has_secret("GEMINI_API_KEY"),
+                "gemini_api_base_url": os.getenv("GEMINI_API_BASE_URL", "https://generativelanguage.googleapis.com"),
+                "gemini_files_upload_url": os.getenv("GEMINI_FILES_UPLOAD_URL", "https://generativelanguage.googleapis.com/upload/v1beta/files"),
+                "gemini_multimodal_model": os.getenv("GEMINI_MODEL_MULTIMODAL", "gemini-2.5-flash"),
+                "gemini_multimodal_reasoning_model": os.getenv("GEMINI_MODEL_MULTIMODAL_REASONING", "gemini-2.5-pro"),
+            },
             "providers": [provider.to_dict() for provider in providers],
         }

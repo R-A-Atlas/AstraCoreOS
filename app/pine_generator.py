@@ -74,6 +74,32 @@ class PineStrategyGenerator:
             created_at=datetime.now(timezone.utc).isoformat(),
         )
 
+    def write_custom_artifact(self, content: str, name: str, export_type: str, summary: str = "") -> StrategyArtifact:
+        clean_name = self._clean_title(name)
+        clean_export_type = export_type.strip().lower()
+        suffix = {
+            "pine": ".pine",
+            "mt5": ".mq5",
+            "mql5": ".mq5",
+            "instructions": ".html",
+            "brief": ".html",
+            "markdown": ".html",
+        }.get(clean_export_type)
+        if suffix is None:
+            raise ValueError("Unsupported export type.")
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        filename = self._safe_filename(clean_name, suffix)
+        path = self.output_dir / filename
+        path.write_text(content, encoding="utf-8")
+        return StrategyArtifact(
+            id=str(uuid4()),
+            title=clean_name,
+            filename=filename,
+            path=str(path),
+            summary=summary or f"Generated {clean_export_type} export from AstraCore AI Brain.",
+            created_at=datetime.now(timezone.utc).isoformat(),
+        )
+
     @staticmethod
     def _clean_title(name: str) -> str:
         cleaned = re.sub(r"\s+", " ", (name or "").strip())

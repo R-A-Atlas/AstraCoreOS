@@ -2,6 +2,10 @@ const state = {
   captures: [],
   selected: null,
   query: "",
+  aiBrain: {
+    enabled: false,
+    exportsEnabled: false,
+  },
 };
 
 const els = {
@@ -24,7 +28,22 @@ const els = {
   exportBtns: document.querySelectorAll(".library-export-btn"),
   exportResult: document.querySelector("#library-export-result"),
   generatedExports: document.querySelector("#generated-exports"),
+  localTemplateMode: document.querySelector("#local-template-mode"),
 };
+
+async function loadConfigStatus() {
+  try {
+    const response = await fetch("/api/config/status");
+    const data = await response.json();
+    const aiBrain = data.status?.ai_brain || {};
+    state.aiBrain.enabled = Boolean(aiBrain.enabled);
+    state.aiBrain.exportsEnabled = Boolean(aiBrain.exports_enabled);
+  } catch {
+    state.aiBrain.enabled = false;
+    state.aiBrain.exportsEnabled = false;
+  }
+  renderExportLabels();
+}
 
 async function loadCaptures() {
   els.list.innerHTML = '<div class="result-box">Loading captures...</div>';
@@ -68,7 +87,7 @@ function renderList() {
       <span class="capture-thumb"></span>
       <span>
         <span class="capture-name">${escapeHtml(capture.display_name || capture.filename)}</span>
-        <span class="capture-meta">${formatBytes(capture.size_bytes)} · ${new Date(capture.created_at).toLocaleString()}</span>
+        <span class="capture-meta">${formatBytes(capture.size_bytes)} - ${new Date(capture.created_at).toLocaleString()}</span>
       </span>
     </button>
   `).join("");
@@ -88,14 +107,14 @@ async function selectCapture(captureId) {
   els.detail.classList.remove("hidden");
   els.video.src = capture.download_url;
   els.title.textContent = capture.display_name || capture.filename;
-  els.meta.textContent = `${capture.filename} · ${formatBytes(capture.size_bytes)} · ${new Date(capture.created_at).toLocaleString()}`;
+  els.meta.textContent = `${capture.filename} - ${formatBytes(capture.size_bytes)} - ${new Date(capture.created_at).toLocaleString()}`;
   els.aiStatus.textContent = capture.ai_review_status || "not_started";
   els.setupType.textContent = capture.setup_type || "unset";
   els.tradeGrade.textContent = capture.trade_grade || "unset";
   els.displayName.value = capture.display_name || capture.filename;
   renderTranscript(capture);
   renderGeneratedExports(capture);
-  els.exportResult.textContent = "Select an export to regenerate it from this capture transcript.";
+  renderAiReadiness(capture);
   renderList();
 }
 
@@ -132,10 +151,38 @@ function renderGeneratedExports(capture) {
   }
   els.generatedExports.innerHTML = exports.slice().reverse().map((item) => `
     <div class="export-history-row">
-      <span>${escapeHtml(item.type || "export")} · ${escapeHtml(item.filename || "output")}</span>
+      <span>${escapeHtml(item.type || "export")} - ${escapeHtml(item.source || "local_template")} - ${escapeHtml(item.filename || "output")}</span>
       <span>${item.created_at ? new Date(item.created_at).toLocaleString() : ""}</span>
     </div>
   `).join("");
+}
+
+function renderExportLabels() {
+  const localMode = Boolean(els.localTemplateMode?.checked);
+  els.exportBtns.forEach((button) => {
+    const exportType = button.dataset.exportType || "pine";
+    const label = exportType === "mt5" ? "MT5 / MQL5" : exportType === "instructions" ? "Visual Playbook" : "Pine Export";
+    button.textContent = localMode ? `Local Template ${label}` : `AI ${label}`;
+  });
+  if (state.selected) {
+    renderAiReadiness(state.selected);
+  }
+}
+
+function renderAiReadiness(capture) {
+  if (els.localTemplateMode?.checked) {
+    els.exportResult.textContent = "Local Template mode uses the selected transcript only. It is not AI chart analysis.";
+    return;
+  }
+  if (!state.aiBrain.enabled || !state.aiBrain.exportsEnabled) {
+    els.exportResult.textContent = "AI Brain disabled. Enable ASTRA_AI_BRAIN_ENABLED and ASTRA_AI_EXPORTS_ENABLED in .env, then restart the server.";
+    return;
+  }
+  if (!capture.ready_for_ai) {
+    els.exportResult.textContent = "This capture is not ready for AI export. It needs a saved video plus mic audio or transcript context.";
+    return;
+  }
+  els.exportResult.textContent = "Ready for AI export. AstraCore will send the selected video plus voice/transcript context to the multimodal AI Brain.";
 }
 
 async function saveName() {
@@ -189,10 +236,13 @@ async function exportSelected(exportType) {
   if (!state.selected) {
     return;
   }
+  const exportMode = els.localTemplateMode?.checked ? "local" : "ai";
   els.exportBtns.forEach((button) => {
     button.disabled = true;
   });
-  els.exportResult.textContent = "Building export from selected capture transcript...";
+  els.exportResult.textContent = exportMode === "ai"
+    ? "Building AI export from selected video plus voice/transcript context..."
+    : "Building Local Template export from selected capture transcript...";
   try {
     const response = await fetch(`/api/captures/${state.selected.id}/export`, {
       method: "POST",
@@ -200,6 +250,7 @@ async function exportSelected(exportType) {
       body: JSON.stringify({
         name: els.displayName.value.trim() || "AstraCore Scalp Assist",
         export_type: exportType,
+        export_mode: exportMode,
       }),
     });
     const data = await response.json().catch(() => ({}));
@@ -211,6 +262,7 @@ async function exportSelected(exportType) {
     els.exportResult.innerHTML = `
       <strong>${escapeHtml(data.strategy.title)}</strong><br>
       ${escapeHtml(data.strategy.summary)}<br>
+      Source: ${escapeHtml(data.strategy.source || exportMode)}<br>
       <a href="${data.strategy.download_url}" download>Download ${escapeHtml(data.strategy.filename)}</a>
     `;
     renderGeneratedExports(data.capture);
@@ -252,5 +304,7 @@ els.deleteCapture.addEventListener("click", deleteCapture);
 els.exportBtns.forEach((button) => {
   button.addEventListener("click", () => exportSelected(button.dataset.exportType || "pine"));
 });
+els.localTemplateMode?.addEventListener("change", renderExportLabels);
 
+loadConfigStatus();
 loadCaptures();
