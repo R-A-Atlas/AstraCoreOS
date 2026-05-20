@@ -68,7 +68,7 @@ class CaptureExportRequest(BaseModel):
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(
-        WEB / "studio.html",
+        WEB / "landing.html",
         media_type="text/html; charset=utf-8",
         headers={"Cache-Control": "no-store"},
     )

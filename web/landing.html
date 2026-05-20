@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AstraCore - Trading Strategy Capture</title>
+  <link rel="stylesheet" href="/static/landing.css" />
+</head>
+<body>
+  <main class="landing-shell">
+    <header class="landing-nav">
+      <a class="brand" href="/" aria-label="AstraCore landing">
+        <span class="brand-mark"></span>
+        <span>AstraCore</span>
+      </a>
+      <nav class="nav-links" aria-label="Landing navigation">
+        <a href="#workflow">Workflow</a>
+        <a href="/studio">Studio</a>
+        <a href="/library">Library</a>
+        <a href="#next-layer">Roadmap</a>
+      </nav>
+      <a class="nav-cta" href="/studio">Launch Studio</a>
+    </header>
+
+    <section class="hero" aria-label="AstraCore overview">
+      <div class="hero-copy">
+        <p class="system-line">Local-first trading strategy development assistant</p>
+        <h1>ASTRACORE</h1>
+        <p class="hero-subcopy">Record your chart, explain your read, and turn the session into strategy files.</p>
+        <div class="hero-actions">
+          <a class="primary-action" href="/studio">Launch Studio</a>
+          <a class="secondary-action" href="/library">Open Capture Library</a>
+        </div>
+      </div>
+
+      <div class="hero-visual" aria-label="Live chart strategy preview">
+        <div class="portal-ring" aria-hidden="true">
+          <span class="ring ring-one"></span>
+          <span class="ring ring-two"></span>
+          <span class="ring ring-three"></span>
+        </div>
+        <canvas id="liveChart" class="live-canvas" aria-hidden="true"></canvas>
+
+        <div id="liveScenePhase" class="scene-phase">
+          <span class="phase-dot"></span>
+          <span id="liveScenePhaseText">WATCHING</span>
+        </div>
+
+        <div id="livePrice" class="live-price">
+          <span class="lp-label">NQ1! - 5m</span>
+          <span id="livePriceVal" class="lp-val">18842.25</span>
+          <span id="livePriceDelta" class="lp-delta" data-tone="up">+0.18%</span>
+        </div>
+
+        <div id="badgeEntry" class="anchor-badge">
+          <span>ENTRY</span>
+        </div>
+        <div id="badgeR1" class="anchor-badge target-badge">
+          <span>R1</span>
+        </div>
+        <div id="badgeR2" class="anchor-badge target-badge target-two">
+          <span>R2</span>
+        </div>
+
+        <div id="alertToast" class="alert-toast">
+          <strong>Alert prepared</strong>
+          <span>Pine condition ready for TradingView</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="live-strip" aria-label="Current workflow">
+      <article class="strip-card">
+        <div class="strip-head">
+          <span id="recLed" class="strip-led"></span>
+          <span>Capture</span>
+        </div>
+        <h2>Screen + voice</h2>
+        <p>Record the TradingView screen while narrating what you see and why the setup matters.</p>
+        <div class="voice-strip" aria-hidden="true">
+          <span class="voice-bar"></span><span class="voice-bar"></span><span class="voice-bar"></span>
+          <span class="voice-bar"></span><span class="voice-bar"></span><span class="voice-bar"></span>
+          <span class="voice-bar"></span><span class="voice-bar"></span><span class="voice-bar"></span>
+          <span class="voice-bar"></span><span class="voice-bar"></span><span class="voice-bar"></span>
+        </div>
+      </article>
+
+      <article class="strip-card">
+        <div class="strip-head">
+          <span class="strip-led purple"></span>
+          <span>Distill</span>
+        </div>
+        <h2>Transcript sidecars</h2>
+        <p>The session transcript is saved beside the video so old captures can become strategy source material.</p>
+        <pre class="pine-monitor"><code id="pineLines"></code></pre>
+      </article>
+
+      <article class="strip-card">
+        <div class="strip-head">
+          <span class="strip-led green"></span>
+          <span>Export</span>
+        </div>
+        <h2>Pine v6 / MT5 / Visual Playbook</h2>
+        <p>Generate Pine Script, MT5/MQL5 starters, or a visual HTML playbook from the selected capture.</p>
+        <ul class="artifact-list">
+          <li>Pine Script strategy starter</li>
+          <li>MT5/MQL5 expert advisor starter</li>
+          <li>Visual strategy playbook</li>
+        </ul>
+      </article>
+    </section>
+
+    <section id="workflow" class="workflow" aria-label="How AstraCore works">
+      <div class="section-heading">
+        <p>Built workflow</p>
+        <h2>Capture the trade. Review the reasoning. Export the strategy.</h2>
+      </div>
+
+      <div class="workflow-grid">
+        <article class="workflow-card">
+          <span class="step">01</span>
+          <h3>Capture the trade</h3>
+          <p>Open Studio, choose your display or TradingView window, turn on the mic, and record the exact setup you are reading.</p>
+        </article>
+        <article class="workflow-card">
+          <span class="step">02</span>
+          <h3>Review the reasoning</h3>
+          <p>Saved sessions keep the video, transcript, metadata, and generated files together inside the Capture Library.</p>
+        </article>
+        <article class="workflow-card">
+          <span class="step">03</span>
+          <h3>Export the strategy</h3>
+          <p>Regenerate Pine, MT5/MQL5, or a visual playbook from any old capture without manually rewriting your notes.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="status-band" aria-label="Current product status">
+      <div class="status-item">
+        <span>Current</span>
+        <strong>Local capture memory</strong>
+      </div>
+      <div class="status-item">
+        <span>Generated</span>
+        <strong>Strategy artifacts</strong>
+      </div>
+      <div class="status-item">
+        <span>Stored</span>
+        <strong>Video + transcript</strong>
+      </div>
+      <div class="status-item">
+        <span>Next</span>
+        <strong>AI trade review</strong>
+      </div>
+    </section>
+
+    <section id="next-layer" class="next-layer" aria-label="Next AI layer">
+      <div>
+        <p class="system-line">Next layer</p>
+        <h2>AI review is the next build, not a fake claim.</h2>
+      </div>
+      <p>
+        AstraCore already records, stores, manages, and exports strategy files from capture transcripts. The next production layer is model-backed review: transcript plus selected video frames, timestamped critique, repeated setup detection, and cleaner strategy rules over time.
+      </p>
+    </section>
+
+    <footer class="landing-footer">
+      <p>Local-first trading strategy development assistant.</p>
+      <div>
+        <a href="/studio">Studio</a>
+        <a href="/library">Library</a>
+      </div>
+    </footer>
+  </main>
+
+  <script src="/static/live-scene.js"></script>
+</body>
+</html>

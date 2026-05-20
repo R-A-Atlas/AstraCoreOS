@@ -406,14 +406,19 @@ def test_studio_route_serves_focused_capture_ui():
     assert "/static/studio.js" in response.text
 
 
-def test_root_route_serves_studio():
+def test_root_route_serves_landing_page():
     client = TestClient(app)
 
     root_response = client.get("/")
 
     assert root_response.status_code == 200
-    assert "AstraCore Studio" in root_response.text
-    assert "/static/studio.js" in root_response.text
+    assert "AstraCore - Trading Strategy Capture" in root_response.text
+    assert "Record your chart, explain your read" in root_response.text
+    assert "/static/landing.css" in root_response.text
+    assert "/static/live-scene.js" in root_response.text
+    assert 'href="/studio"' in root_response.text
+    assert 'href="/library"' in root_response.text
+    assert "/static/studio.js" not in root_response.text
     assert "AstraCore Trading Command Center" not in root_response.text
     assert "/static/app.js" not in root_response.text
     assert root_response.headers["cache-control"] == "no-store"

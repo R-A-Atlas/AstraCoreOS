@@ -18,11 +18,28 @@ The long-term goal is to become a personal trading coach and strategy memory sys
 
 ## Current User-Facing App
 
-### Studio
+### Landing Page
 
 Routes:
 
 - `/`
+
+Purpose:
+
+- Public entry page for AstraCore.
+- Explains the capture-to-strategy workflow.
+- Links to Studio and Capture Library.
+- Uses truthful current product language only:
+  - screen + mic capture
+  - transcript sidecars
+  - Pine v6 / MT5 / Visual Playbook
+  - local capture memory
+- Describes AI trade review as the next layer, not as already live.
+
+### Studio
+
+Routes:
+
 - `/studio`
 
 Purpose:
@@ -76,7 +93,7 @@ Main backend:
 
 - `app/backend.py`
 - FastAPI application.
-- Serves Studio and Capture Library pages.
+- Serves Landing, Studio, and Capture Library pages.
 - Exposes config, capture, export, memory, skill, and TradingView endpoints.
 
 Capture storage:
@@ -239,6 +256,12 @@ Intel/skills:
 
 ## Frontend Files
 
+Landing:
+
+- `web/landing.html`
+- `web/landing.css`
+- `web/live-scene.js`
+
 Studio:
 
 - `web/studio.html`
@@ -272,6 +295,7 @@ JavaScript syntax checks:
 ```powershell
 node --check web\studio.js
 node --check web\library.js
+node --check web\live-scene.js
 ```
 
 Current test coverage includes:
@@ -289,6 +313,7 @@ Current test coverage includes:
 - MT5/MQL5 generation
 - visual HTML playbook generation
 - Studio route
+- Landing route
 - Capture Library route
 - recent tray link to library
 - selected-capture export behavior
