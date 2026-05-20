@@ -432,6 +432,8 @@ def test_library_route_serves_capture_library():
     assert response.status_code == 200
     assert "AstraCore Capture Library" in response.text
     assert "/static/library.js" in response.text
+    assert 'href="/studio"' in response.text
+    assert 'href="/">' not in response.text
 
 
 def test_studio_recent_tray_links_to_library():
