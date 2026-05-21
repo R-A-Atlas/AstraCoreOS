@@ -178,9 +178,9 @@ What is true today:
 - Codex is being used to build the app.
 - The app itself is a local FastAPI/browser app.
 - Studio quick exports still use deterministic Local Template generation.
-- Capture Library exports can use a Gemini multimodal AI Brain when `ASTRA_AI_BRAIN_ENABLED=true`, `ASTRA_AI_EXPORTS_ENABLED=true`, and `GEMINI_API_KEY` is configured.
+- Capture Library exports use saved AI reviews plus transcript and trading memory when `ASTRA_AI_BRAIN_ENABLED=true`, `ASTRA_AI_EXPORTS_ENABLED=true`, and `GEMINI_API_KEY` is configured.
 - Capture Library reviews can use the Gemini multimodal AI Brain when `ASTRA_AI_BRAIN_ENABLED=true`, `ASTRA_AI_REVIEWS_ENABLED=true`, and `GEMINI_API_KEY` is configured.
-- AI export requires selected video plus mic audio or transcript context. Transcript-only AI strategy generation is intentionally blocked.
+- AI export requires a saved AI review first. The expensive video pass happens during AI Review, then Pine/MT5/Visual Playbook exports use the saved review instead of re-uploading large videos.
 - AI review also requires selected video plus mic audio or transcript context.
 
 What is not true yet:
@@ -193,7 +193,8 @@ What is not true yet:
 
 Recommended future model setup:
 
-- Current AI export brain: Gemini multimodal video upload with `gemini-2.5-flash` by default.
+- Current AI review brain: Gemini multimodal video upload with `gemini-2.5-flash` by default.
+- Current AI export brain: Gemini text generation from saved review and trading memory with `gemini-2.5-flash` by default.
 - Possible later primary reviewer: OpenAI GPT-5.5 for hard reasoning, coding, strategy critique, and chart-frame analysis.
 - Low-cost background model: GPT-5.4-mini or Gemini Flash for summaries, tags, and metadata.
 - Optional reviewer: Claude Sonnet 4.6 for second-opinion critique and alternate strategy review.

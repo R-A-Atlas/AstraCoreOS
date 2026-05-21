@@ -252,23 +252,45 @@ function renderExportLabels() {
   });
   if (state.selected) {
     renderAiReadiness(state.selected);
+  } else {
+    syncExportButtonState();
   }
 }
 
 function renderAiReadiness(capture) {
   if (els.localTemplateMode?.checked) {
     els.exportResult.textContent = "Local Template mode uses the selected transcript only. It is not AI chart analysis.";
+    syncExportButtonState();
     return;
   }
   if (!state.aiBrain.enabled || !state.aiBrain.exportsEnabled) {
     els.exportResult.textContent = "AI Brain disabled. Enable ASTRA_AI_BRAIN_ENABLED and ASTRA_AI_EXPORTS_ENABLED in .env, then restart the server.";
+    syncExportButtonState();
     return;
   }
   if (!capture.ready_for_ai) {
     els.exportResult.textContent = "This capture is not ready for AI export. It needs a saved video plus mic audio or transcript context.";
+    syncExportButtonState();
     return;
   }
-  els.exportResult.textContent = "Ready for AI export. AstraCore will send the selected video plus voice/transcript context to the multimodal AI Brain.";
+  if (!capture.has_ai_review) {
+    els.exportResult.textContent = "Run AI Review before AI export. Exports use the saved video-based review so they do not re-upload the full recording each time.";
+    syncExportButtonState();
+    return;
+  }
+  els.exportResult.textContent = "Ready for AI export. AstraCore will use the saved AI review, transcript, and trading memory.";
+  syncExportButtonState();
+}
+
+function syncExportButtonState(forceDisabled = false) {
+  const localMode = Boolean(els.localTemplateMode?.checked);
+  const selected = state.selected;
+  const shouldDisable = forceDisabled
+    || !selected
+    || (!localMode && (!state.aiBrain.enabled || !state.aiBrain.exportsEnabled || !selected.ready_for_ai || !selected.has_ai_review));
+  els.exportBtns.forEach((button) => {
+    button.disabled = shouldDisable;
+  });
 }
 
 function renderReviewReadiness(capture) {
@@ -382,16 +404,19 @@ async function exportSelected(exportType) {
     return;
   }
   const exportMode = els.localTemplateMode?.checked ? "local" : "ai";
-  els.exportBtns.forEach((button) => {
-    button.disabled = true;
-  });
+  if (exportMode === "ai" && !state.selected.has_ai_review) {
+    els.exportResult.textContent = "Run AI Review before AI export.";
+    setVoiceRing("error", "Review needed", "Run AI Review first");
+    return;
+  }
+  syncExportButtonState(true);
   els.exportResult.textContent = exportMode === "ai"
-    ? "Building AI export from selected video plus voice/transcript context..."
+    ? "Building AI export from saved review + trading memory..."
     : "Building Local Template export from selected capture transcript...";
   setVoiceRing(
     exportMode === "ai" ? "exporting" : "reviewing",
     exportMode === "ai" ? "AI exporting" : "Local export",
-    exportMode === "ai" ? "Video + transcript in use" : "Transcript template in use",
+    exportMode === "ai" ? "Review + memory in use" : "Transcript template in use",
   );
   try {
     const response = await fetch(`/api/captures/${state.selected.id}/export`, {
@@ -422,9 +447,7 @@ async function exportSelected(exportType) {
     els.exportResult.textContent = error.message || "Could not generate export.";
     setVoiceRing("error", "Export failed", error.message || "Could not generate export");
   } finally {
-    els.exportBtns.forEach((button) => {
-      button.disabled = false;
-    });
+    renderAiReadiness(state.selected);
   }
 }
 
